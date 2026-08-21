@@ -36,6 +36,7 @@ class _CdmxMapViewState extends State<CdmxMapView> {
   final MapController _mapController = MapController();
   bool _showZoneOverlays = true;
   List<List<LatLng>> _municipios = [];
+  List<ZonaGeo> _zonas = [];
   LatLng? _mousePos;
   LatLng _initialCenter = const LatLng(19.432608, -99.133208);
   @override
@@ -43,11 +44,29 @@ class _CdmxMapViewState extends State<CdmxMapView> {
     super.initState();
     _initialCenter = LatLng(widget.latitude, widget.longitude);
     _loadMunicipios();
+    _loadZonas();
   }
 
   Future<void> _loadMunicipios() async {
     final p = await MapService.loadAreaPolygons();
     if (mounted) setState(() => _municipios = p);
+  }
+
+  Future<void> _loadZonas() async {
+    final z = await MapService.loadZonasGeotecnica();
+    if (mounted) setState(() => _zonas = z);
+  }
+
+  /// Color oficial por zona geotécnica NTC.
+  static Color _colorForZona(String zona) {
+    switch (zona) {
+      case 'Zona I':
+        return GeotechnicalZone.zonaI.color;
+      case 'Zona II':
+        return GeotechnicalZone.zonaII.color;
+      default:
+        return GeotechnicalZone.zonaIIIc.color;
+    }
   }
 
   void _centerCdmx() {
@@ -143,58 +162,20 @@ class _CdmxMapViewState extends State<CdmxMapView> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.sasid.app',
               ),
-              if (_showZoneOverlays && widget.showLomasDivision)
+              // Zonificación geotécnica oficial NTC-2017 (GeoJSON).
+              if (_showZoneOverlays &&
+                  widget.showLomasDivision &&
+                  _zonas.isNotEmpty)
                 PolygonLayer(
                   polygons: [
-                    Polygon(
-                      points: const [
-                        LatLng(19.55, -99.35),
-                        LatLng(19.50, -99.25),
-                        LatLng(19.42, -99.20),
-                        LatLng(19.33, -99.19),
-                        LatLng(19.24, -99.20),
-                        LatLng(19.15, -99.28),
-                        LatLng(19.15, -99.35),
-                      ],
-                      color: GeotechnicalZone.zonaI.color.withValues(
-                        alpha: 0.20,
-                      ),
-                      borderColor: GeotechnicalZone.zonaI.color,
-                      borderStrokeWidth: 2,
-                    ),
-                    Polygon(
-                      points: const [
-                        LatLng(19.52, -99.22),
-                        LatLng(19.45, -99.18),
-                        LatLng(19.38, -99.16),
-                        LatLng(19.30, -99.16),
-                        LatLng(19.25, -99.18),
-                        LatLng(19.30, -99.14),
-                        LatLng(19.38, -99.14),
-                        LatLng(19.46, -99.16),
-                      ],
-                      color: GeotechnicalZone.zonaII.color.withValues(
-                        alpha: 0.25,
-                      ),
-                      borderColor: GeotechnicalZone.zonaII.color,
-                      borderStrokeWidth: 2,
-                    ),
-                    Polygon(
-                      points: const [
-                        LatLng(19.52, -99.16),
-                        LatLng(19.46, -99.16),
-                        LatLng(19.38, -99.14),
-                        LatLng(19.28, -99.14),
-                        LatLng(19.24, -99.00),
-                        LatLng(19.38, -98.96),
-                        LatLng(19.50, -99.02),
-                      ],
-                      color: GeotechnicalZone.zonaIIIc.color.withValues(
-                        alpha: 0.22,
-                      ),
-                      borderColor: GeotechnicalZone.zonaIIIc.color,
-                      borderStrokeWidth: 2,
-                    ),
+                    for (final z in _zonas)
+                      for (final ring in z.rings)
+                        Polygon(
+                          points: ring,
+                          color: _colorForZona(z.zona).withValues(alpha: 0.18),
+                          borderColor: _colorForZona(z.zona),
+                          borderStrokeWidth: 1.5,
+                        ),
                   ],
                 ),
               if (widget.showMunicipios && _municipios.isNotEmpty)

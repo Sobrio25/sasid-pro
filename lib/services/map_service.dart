@@ -1,7 +1,70 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 
+/// Polígono de zonificación geotécnica oficial con sus anillos exteriores.
+class ZonaGeo {
+  final String zona; // 'Zona I' | 'Zona II' | 'Zona III'
+  final String nombre;
+  final List<List<LatLng>> rings;
+
+  const ZonaGeo({
+    required this.zona,
+    required this.nombre,
+    required this.rings,
+  });
+}
+
 class MapService {
+  /// Zonificación geotécnica oficial NTC-2017 desde GeoJSON (WGS84).
+  static Future<List<ZonaGeo>> loadZonasGeotecnica() async {
+    try {
+      final txt = await rootBundle.loadString(
+        'assets/geojson/zonificacion_geotecnica_2017.geojson',
+      );
+      final data = jsonDecode(txt) as Map<String, dynamic>;
+      final features = data['features'] as List<dynamic>;
+      final List<ZonaGeo> out = [];
+      for (final f in features) {
+        final props = f['properties'] as Map<String, dynamic>;
+        final geom = f['geometry'] as Map<String, dynamic>;
+        final List<dynamic> ringsRaw;
+        if (geom['type'] == 'Polygon') {
+          ringsRaw = [geom['coordinates'] as List<dynamic>];
+        } else if (geom['type'] == 'MultiPolygon') {
+          ringsRaw = (geom['coordinates'] as List<dynamic>)
+              .expand((p) => p as List<dynamic>)
+              .toList();
+        } else {
+          continue;
+        }
+        final rings = ringsRaw
+            .map(
+              (ring) => (ring as List<dynamic>)
+                  .map(
+                    (c) => LatLng(
+                      (c[1] as num).toDouble(),
+                      (c[0] as num).toDouble(),
+                    ),
+                  )
+                  .toList(),
+            )
+            .toList();
+        out.add(
+          ZonaGeo(
+            zona: props['zona']?.toString() ?? '',
+            nombre: props['nombre']?.toString() ?? '',
+            rings: rings,
+          ),
+        );
+      }
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }
+
   static Future<List<List<LatLng>>> loadAreaPolygons() async {
     final List<List<LatLng>> all = [];
     for (int i = 2; i <= 17; i++) {
@@ -43,14 +106,5 @@ class MapService {
     }
     if (current.length > 2) polygons.add(current);
     return polygons;
-  }
-
-  static Future<List<LatLng>> loadNtc04Zones() async {
-    try {
-      final txt = await rootBundle.loadString('assets/Mapa/NTC04-Zonas.txt');
-      return _parseAreaTxt(txt).expand((e) => e).toList();
-    } catch (_) {
-      return [];
-    }
   }
 }
