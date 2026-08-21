@@ -255,6 +255,12 @@ class _CdmxMapViewState extends State<CdmxMapView> {
                   ),
                 ],
               ),
+              // Atribución obligatoria según OSM Tile Usage Policy.
+              RichAttributionWidget(
+                attributions: [
+                  TextSourceAttribution('© OpenStreetMap contributors'),
+                ],
+              ),
             ],
           ),
           Positioned(
