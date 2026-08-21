@@ -62,5 +62,18 @@ void main() {
       expect(site.zone.name, startsWith('Zona III'));
       expect(site.ts, greaterThan(2.5));
     });
+
+    test('Tláhuac: polígono dice lago aunque el grid dé Ts<1.0', () async {
+      // El grid ERN da Ts=0.485s ahí (artefacto junto a Sierra Santa
+      // Catarina); la geometría oficial es Zona III -> se acota al piso
+      // del lago y la subzona mínima es IIIa.
+      final site = await SeismicEngine.calculateSiteParametersWithGrid(
+        19.275426,
+        -99.018161,
+      );
+      expect(site.zone.name, startsWith('Zona III'));
+      expect(site.ts, inInclusiveRange(1.0, 1.5));
+      expect(site.a0, greaterThan(0.10));
+    });
   });
 }

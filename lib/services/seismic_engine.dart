@@ -135,7 +135,12 @@ class SeismicEngine {
     }
 
     // Zona III (lago) o fuera de cobertura: modelo continuo calibrado.
-    final p = params2016ForTs(ts, epoch: epoch);
+    // Si la geometría oficial dice lago pero el grid da Ts<1.0 (artefacto
+    // de resolución cerca de los islotes, p. ej. Tláhuac junto a la Sierra
+    // Santa Catarina), se acota al piso normativo del lago: la zona la
+    // indica el polígono y dentro de ella la subzona mínima es IIIa.
+    final tsEfectivo = zonaGeo == 'Zona III' ? math.max(ts, 1.05) : ts;
+    final p = params2016ForTs(tsEfectivo, epoch: epoch);
     return SiteParameters(
       latitude: lat,
       longitude: lon,
