@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.12.2
@@ -42,6 +42,8 @@ dependencies:
   http: ^1.6.0
   intl: ^0.20.3
   path_provider: ^2.1.6
+  file_picker: ^10.3.2
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +66,33 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  assets:
+    - assets/grids/CMaximo.grd
+    - assets/grids/CMaximo2050_Tr250.grd
+    - assets/grids/Mallas Futuras/Malla Tmin/ES_DFTmin.grd
+    - assets/grids/Mallas Futuras/Malla1985/ES_DF1985.grd
+    - assets/grids/Mallas Futuras/Malla2010/ES_DF2010.grd
+    - assets/grids/Mallas Futuras/Malla2030/ES_DF2030.grd
+    - assets/grids/Mallas Futuras/Malla2050/ES_DF2050.grd
+    - assets/grids/Mallas Futuras/Malla2100/ES_DF2100.grd
+    - assets/Mapa/Area02.txt
+    - assets/Mapa/Area03.txt
+    - assets/Mapa/Area04.txt
+    - assets/Mapa/Area05.txt
+    - assets/Mapa/Area06.txt
+    - assets/Mapa/Area07.txt
+    - assets/Mapa/Area08.txt
+    - assets/Mapa/Area09.txt
+    - assets/Mapa/Area10.txt
+    - assets/Mapa/Area11.txt
+    - assets/Mapa/Area12.txt
+    - assets/Mapa/Area13.txt
+    - assets/Mapa/Area14.txt
+    - assets/Mapa/Area15.txt
+    - assets/Mapa/Area16.txt
+    - assets/Mapa/Area17.txt
+    - assets/Mapa/DF_Nodo.txt
+    - assets/Mapa/NTC04-Zonas.txt
 
   # To add assets to your application, add an assets section, like this:
   # assets:
