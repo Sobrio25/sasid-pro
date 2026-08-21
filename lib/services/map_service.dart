@@ -18,7 +18,10 @@ class ZonaGeo {
 
 class MapService {
   /// Zonificación geotécnica oficial NTC-2017 desde GeoJSON (WGS84).
+  static List<ZonaGeo>? _zonasCache;
+
   static Future<List<ZonaGeo>> loadZonasGeotecnica() async {
+    if (_zonasCache != null) return _zonasCache!;
     try {
       final txt = await rootBundle.loadString(
         'assets/geojson/zonificacion_geotecnica_2017.geojson',
@@ -69,8 +72,43 @@ class MapService {
       }
       return out;
     } catch (_) {
-      return [];
+      _zonasCache ??= const [];
+      return _zonasCache!;
     }
+  }
+
+  /// Zona geotécnica oficial en el punto dado mediante ray-casting sobre
+  /// los polígonos del GeoJSON: 'Zona I' | 'Zona II' | 'Zona III' | null.
+  ///
+  /// Los polígonos se traslapan (el lago no recorta sus islotes rocosos),
+  /// así que se evalúan en orden INVERSO al archivo: las zonas específicas
+  /// dibujadas encima (I, II) tienen precedencia sobre la envolvente (III).
+  static Future<String?> zoneAtPoint(double lat, double lon) async {
+    final zonas = await loadZonasGeotecnica();
+    for (final z in zonas.reversed) {
+      for (final ring in z.rings) {
+        if (_pointInRing(lat, lon, ring)) return z.zona;
+      }
+    }
+    return null;
+  }
+
+  /// Ray-casting estándar punto-en-polígono.
+  static bool _pointInRing(double lat, double lon, List<LatLng> ring) {
+    var inside = false;
+    var j = ring.length - 1;
+    for (var i = 0; i < ring.length; i++) {
+      final yi = ring[i].latitude;
+      final xi = ring[i].longitude;
+      final yj = ring[j].latitude;
+      final xj = ring[j].longitude;
+      if (((yi > lat) != (yj > lat)) &&
+          (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+      j = i;
+    }
+    return inside;
   }
 
   static Future<List<List<LatLng>>> loadAreaPolygons() async {

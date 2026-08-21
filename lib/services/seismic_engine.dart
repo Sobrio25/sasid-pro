@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import '../models/epoch.dart';
 import '../models/seismic_models.dart';
 import 'grd_service.dart';
+import 'map_service.dart';
 
 /// Motor de cálculo de espectros NTC-CDMX.
 ///
@@ -81,13 +82,59 @@ class SeismicEngine {
   /// misma malla SASID continua: el numeral 3.1.2 —idéntico en 2017 y 2023—
   /// establece que a0, c, k, Ta, Tb y Ts "se tomarán del SASID". Las normas
   /// solo difieren en las fórmulas de reducción, no en los parámetros.
+  ///
+  /// La zonificación oficial (ShapeFile NTC-2017 en GeoJSON) manda sobre el
+  /// grid: si el punto cae en Zona I o II, se usan parámetros normativos de
+  /// tabla — el modelo continuo ERN solo es válido en la zona de lago, y las
+  /// islas rocosas (Peñón de los Baños, Cerro de la Estrella, Sierra Santa
+  /// Catarina) quedan mal resueltas por la resolución del grid.
   static Future<SiteParameters> calculateSiteParametersWithGrid(
     double lat,
     double lon, {
     Epoch epoch = Epoch.y2010,
   }) async {
-    final tsGrid = await GrdService.interpolateTs(lat, lon, epoch.assetPath);
-    final ts = tsGrid ?? _fallbackTs(lat, lon);
+    final zonaGeo = await MapService.zoneAtPoint(lat, lon);
+    final tsGridVal = await GrdService.interpolateTs(lat, lon, epoch.assetPath);
+
+    // Zona I (lomas): parámetros normativos de tabla firme.
+    if (zonaGeo == 'Zona I') {
+      final tsEff = ((tsGridVal ?? _fallbackTs(lat, lon)).clamp(0.15, 0.50));
+      return SiteParameters(
+        latitude: lat,
+        longitude: lon,
+        ts: double.parse(tsEff.toStringAsFixed(3)),
+        a0: 0.06,
+        c: double.parse((0.18 + (tsEff / 0.5) * 0.04).toStringAsFixed(3)),
+        ta: 0.20,
+        tb: 0.60,
+        k: 1.00,
+        zone: GeotechnicalZone.zonaI,
+        epoch: epoch,
+        activeMallaHex: epoch.hexCode,
+      );
+    }
+
+    final ts = tsGridVal ?? _fallbackTs(lat, lon);
+
+    // Zona II (transición): modelo continuo acotado al rango normativo.
+    if (zonaGeo == 'Zona II') {
+      final p = params2016ForTs(math.min(ts, 1.0), epoch: epoch);
+      return SiteParameters(
+        latitude: lat,
+        longitude: lon,
+        ts: p.ts,
+        a0: p.a0,
+        c: p.c,
+        ta: p.ta,
+        tb: p.tb,
+        k: p.k,
+        zone: GeotechnicalZone.zonaII,
+        epoch: epoch,
+        activeMallaHex: epoch.hexCode,
+      );
+    }
+
+    // Zona III (lago) o fuera de cobertura: modelo continuo calibrado.
     final p = params2016ForTs(ts, epoch: epoch);
     return SiteParameters(
       latitude: lat,
