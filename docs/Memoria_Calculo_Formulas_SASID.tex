@@ -1,0 +1,275 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{tcolorbox}
+\usepackage{titlesec}
+\usepackage{enumitem}
+
+\definecolor{primary}{RGB}{15, 23, 42}
+\definecolor{accent}{RGB}{37, 99, 235}
+\definecolor{boxbg}{RGB}{248, 250, 252}
+\definecolor{boxborder}{RGB}{226, 232, 240}
+\definecolor{headerbg}{RGB}{30, 58, 138}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=accent,
+    filecolor=accent,
+    urlcolor=accent,
+    pdftitle={Memoria Técnica y Formulación Matemática - SASID CDMX},
+    pdfauthor={SASID Pro - Sobrio25}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textsf{\textcolor{gray}{SASID Pro | Memoria Técnica y Formulación Matemática}}}
+\fancyhead[R]{\small\textsf{\textcolor{gray}{NTC-Sismo CDMX 2017/2023}}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\section}{\Large\bfseries\color{primary}}{\thesection.}{0.6em}{}[\titlerule]
+\titleformat{\subsection}{\large\bfseries\color{headerbg}}{\thesubsection.}{0.5em}{}
+
+\tcbuselibrary{skins,breakable}
+\newtcolorbox{formulabox}[1]{
+    colback=boxbg,
+    colframe=accent,
+    fonttitle=\bfseries\color{white},
+    title=#1,
+    boxrule=1pt,
+    arc=4pt,
+    left=8pt,
+    right=8pt,
+    top=6pt,
+    bottom=6pt,
+    breakable
+}
+
+\begin{document}
+
+% Encabezado Principal
+\begin{center}
+    {\Huge\bfseries\color{primary} Formulación Matemática y Memoria Técnica}\\[6pt]
+    {\LARGE\bfseries\color{headerbg} Generación de Espectros Sísmicos de Diseño (NTC-CDMX)}\\[10pt]
+    {\large\textbf{Sistema de Acciones Sísmicas de Diseño -- SASID Pro}}\\[4pt]
+    \textsf{\textcolor{gray}{Implementación en Flutter: \href{https://github.com/Sobrio25/sasid-pro}{github.com/Sobrio25/sasid-pro}}}\\[14pt]
+    \rule{\linewidth}{1pt}
+\end{center}
+
+\vspace{0.2cm}
+
+\section{Introducción y Marco Normativo}
+El presente documento describe de manera rigurosa las expresiones matemáticas, los parámetros geotécnicos y los factores estructurales implementados en la aplicación \textbf{SASID Pro} para la construcción de los espectros de respuesta elásticos e inelásticos de diseño sísmico en la Ciudad de México.
+
+La metodología y formulación analítica se sustentan en los siguientes instrumentos oficiales:
+\begin{itemize}[noitemsep,topsep=2pt]
+    \item \textbf{Normas Técnicas Complementarias para Diseño por Sismo (NTC-Sismo 2017 / 2023)}, publicadas en la \textit{Gaceta Oficial de la Ciudad de México} (Apéndice A y Capítulo 3).
+    \item \textbf{Manual Técnico SASID A}, desarrollado por el Instituto de Ingeniería de la UNAM (\textsf{II-UNAM}) y la Sociedad Mexicana de Ingeniería Sísmica (\textsf{SMIS}).
+    \item \textbf{NTC-Sismo 2004}, aplicadas en el módulo de evaluación comparativa histórica.
+\end{itemize}
+
+\vspace{0.2cm}
+
+\section{Zonificación Geotécnica y Parámetros del Sitio}
+La demanda sísmica en la Cuenca de México depende fuertemente de las condiciones estratigráficas locales, caracterizadas por el periodo dominante de vibración del suelo $T_s$. Las NTC clasifican el terreno en las siguientes zonas:
+
+\begin{table}[h!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}llcccl@{}}
+\toprule
+\textbf{Zona} & \textbf{Denominación} & \textbf{Rango $T_s$ (s)} & \textbf{$a_0$ (g)} & \textbf{$c$ (g)} & \textbf{Descripción Geotécnica} \\
+\midrule
+\textbf{Zona I}   & Lomas (Firme)         & $T_s \le 0.5$    & $0.06$       & $0.18 - 0.22$ & Tobas volcánicas, arenas y gravas compactas. \\
+\textbf{Zona II}  & Transición            & $0.5 < T_s \le 1.0$ & $0.08 - 0.11$ & $0.22 - 0.45$ & Depósitos arcillosos de espesor moderado. \\
+\textbf{Zona IIIa}& Lago (Blando)         & $1.0 < T_s \le 1.5$ & $0.11 - 0.14$ & $0.45 - 0.65$ & Arcillas altamente compresibles. \\
+\textbf{Zona IIIb}& Lago (Espesor medio)  & $1.5 < T_s \le 2.0$ & $0.14 - 0.16$ & $0.65 - 0.85$ & Arcillas lacustres de gran espesor. \\
+\textbf{Zona IIIc}& Lago (Profundo)       & $2.0 < T_s \le 3.0$ & $0.16 - 0.19$ & $0.85 - 1.00$ & Depósitos arcillosos profundos. \\
+\textbf{Zona IIId}& Lago (Muy blando)     & $T_s > 3.0$      & $0.19 - 0.22$ & $1.00 - 1.10$ & Zonas de máxima amplificación dinámica. \\
+\bottomrule
+\end{tabular}
+\caption{Parámetros de sitio según la zonificación geotécnica de las NTC-CDMX.}
+\end{table}
+
+\vspace{-0.2cm}
+
+\section{Formulación del Espectro Elástico Transparente $a_e(T)$}
+El espectro elástico representa la seudoaceleración máxima normalizada ($S_a / g$) que experimenta un oscilador simple con una fracción de amortiguamiento crítico $\zeta = 5\%$. De acuerdo con el \textbf{Apéndice A} de las NTC-Sismo:
+
+\begin{formulabox}{Ecuación del Espectro Elástico $a_e(T)$ (Apéndice A NTC)}
+$$
+a_e(T) = 
+\begin{cases} 
+a_0 + (c - a_0) \left(\dfrac{T}{T_a}\right) & \text{si } T < T_a \quad \text{(Rama inicial ascendente)} \\[10pt]
+c & \text{si } T_a \le T \le T_b \quad \text{(Meseta espectral)} \\[10pt]
+c \left(\dfrac{T_b}{T}\right)^k & \text{si } T > T_b \quad \text{(Rama descendente de periodos largos)}
+\end{cases}
+$$
+\end{formulabox}
+
+\textbf{Nomenclatura de variables:}
+\begin{itemize}[noitemsep]
+    \item $T$: Periodo fundamental de vibración de la estructura ($0.0 \le T \le 5.0\,\text{s}$).
+    \item $a_0$: Aceleración máxima del terreno (\textit{Peak Ground Acceleration}, PGA) en fracción de la gravedad $g$.
+    \item $c$: Coeficiente sísmico elástico (ordenada máxima constante de la meseta).
+    \item $T_a, T_b$: Periodos característicos que delimitan el inicio y fin de la meseta espectral.
+    \item $k$: Exponente de decaimiento espectral que controla la caída de aceleraciones para periodos largos.
+\end{itemize}
+
+\newpage
+
+\section{Factores de Modificación y Reducción Inelástica}
+Para considerar la capacidad de disipación de energía por ductilidad y sobrerresistencia de la estructura, las ordenadas elásticas se reducen mediante los factores reglamentarios:
+
+\subsection{1. Factor de Ductilidad Dependiente del Periodo $Q'(T)$}
+El factor de comportamiento sísmico nominal $Q$ ($1.0, 1.5, 2.0, 3.0, 4.0$) se corrige en función del periodo estructural para evitar reducciones excesivas en estructuras muy rígidas ($T < T_a$):
+
+\begin{formulabox}{Factor de Comportamiento Sísmico Reducido $Q'(T)$}
+$$
+Q'(T) = 
+\begin{cases} 
+1 + (Q - 1) \left(\dfrac{T}{T_a}\right) & \text{si } T < T_a \\[8pt]
+Q & \text{si } T \ge T_a
+\end{cases}
+$$
+\end{formulabox}
+
+\subsection{2. Factor de Sobrerresistencia Dependiente del Periodo $R(T)$}
+La sobrerresistencia estructural considera la reserva plástica y la redistribución de esfuerzos:
+
+\begin{formulabox}{Factor de Sobrerresistencia Reducido $R(T)$}
+$$
+R(T) = 
+\begin{cases} 
+1 + (R_0 - 1) \left(\dfrac{T}{T_a}\right) & \text{si } T < T_a \\[8pt]
+R_0 & \text{si } T \ge T_a
+\end{cases}
+$$
+\end{formulabox}
+
+Donde el factor de sobrerresistencia base $R_0$ se calcula a partir de $Q$ y del factor de hiperestaticidad $k_1$:
+\begin{equation}
+R_0 = 
+\begin{cases}
+2.0 \cdot k_1 & \text{para } Q \ge 3.0 \\
+1.75 \cdot k_1 & \text{para } Q = 2.0 \\
+1.50 \cdot k_1 & \text{para } Q = 1.5 \\
+1.00 & \text{para } Q = 1.0
+\end{cases}
+\end{equation}
+
+\subsection{3. Factor de Importancia ($I$) y Factor de Irregularidad ($\alpha$)}
+\begin{itemize}[noitemsep]
+    \item \textbf{Factor de Importancia ($I$):}
+    \begin{itemize}[noitemsep]
+        \item \textbf{Grupo A} ($I = 1.50$): Hospitales, escuelas, centrales eléctricas, estaciones de bomberos.
+        \item \textbf{Grupo B} ($I = 1.00$): Viviendas, comercios, oficinas, hoteles e industrias estándar.
+        \item \textbf{Grupo A1} ($I = 1.75$ / NTC 2023): Instalaciones críticas con materiales peligrosos.
+    \end{itemize}
+    \item \textbf{Factor de Irregularidad ($\alpha$):}
+    \begin{itemize}[noitemsep]
+        \item Regular: $\alpha = 1.00$ \quad | \quad Irregular: $\alpha = 0.90$
+        \item Fuertemente Irregular: $\alpha = 0.80$ \quad | \quad Extremadamente Irregular: $\alpha = 0.70$
+    \end{itemize}
+\end{itemize}
+
+\vspace{0.2cm}
+
+\section{Formulación del Espectro Inelástico de Diseño $a_d(T)$}
+El espectro de diseño final aplicable al análisis modal espectral se calcula afectando la aceleración elástica por los factores anteriores, sujeto a una cota inferior obligatoria:
+
+\begin{formulabox}{Espectro Inelástico de Diseño $a_d(T)$}
+$$
+a_d(T) = \max \left( \frac{I \cdot a_e(T)}{Q'(T) \cdot R(T) \cdot \alpha}, \; a_{\text{mín}} \right)
+$$
+\end{formulabox}
+
+Donde la aceleración mínima de diseño reglamentaria $a_{\text{mín}}$ se evalúa como:
+\begin{equation}
+a_{\text{mín}} = \frac{a_0 \cdot I}{2 \cdot R_0 \cdot \alpha}
+\end{equation}
+
+\vspace{0.2cm}
+
+\section{Espectro de Peligro Uniforme (EPU)}
+El Espectro de Peligro Uniforme corresponde a la envolvente probabilista con periodo de retorno de diseño (475 años) sin afectación por factores inelásticos:
+\begin{equation}
+a_{\text{epu}}(T) = 1.10 \cdot I \cdot a_e(T)
+\end{equation}
+
+\newpage
+
+\section{Formulación Comparativa: NTC-Sismo 2004}
+Para efectos de contraste histórico en la toma de decisiones estructurales, el programa incluye las formulaciones de las normas de 2004:
+
+\subsection{1. Cuerpo Principal NTC 2004 (Por Zonas Clásicas)}
+$$
+a_{2004}(T) = 
+\begin{cases} 
+a_0 + (c - a_0) \left(\dfrac{T}{T_a}\right) & \text{si } T < T_a \\[6pt]
+c & \text{si } T_a \le T \le T_b \\[6pt]
+c \left(\dfrac{T_b}{T}\right)^r & \text{si } T > T_b 
+\end{cases}
+\qquad \implies \qquad
+a_{d,2004}(T) = \frac{a_{2004}(T)}{Q'(T)}
+$$
+
+\begin{table}[h!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Zona NTC 2004} & \textbf{$c$} & \textbf{$a_0$} & \textbf{$T_a$ (s)} & \textbf{$T_b$ (s)} & \textbf{Exponente $r$} \\
+\midrule
+Zona I (Lomas)        & 0.16 & 0.04 & 0.20 & 0.60 & 0.50 \\
+Zona II (Transición)  & 0.32 & 0.08 & 0.30 & 1.50 & 0.67 \\
+Zona III (Lago)       & 0.45 & 0.10 & 0.60 & 2.50 & 1.00 \\
+\bottomrule
+\end{tabular}
+\caption{Parámetros normativos del cuerpo principal de las NTC-Sismo 2004.}
+\end{table}
+
+\vspace{0.2cm}
+
+\section{Correspondencia en el Repositorio de Código}
+La siguiente tabla indica la ubicación exacta de cada componente matemático en el repositorio \href{https://github.com/Sobrio25/sasid-pro}{\texttt{Sobrio25/sasid-pro}}:
+
+\begin{table}[h!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Fórmula / Módulo} & \textbf{Archivo en el Repositorio} & \textbf{Líneas / Función} \\
+\midrule
+Interpolación Geotécnica ($T_s, a_0, c, T_a, T_b, k$) & \texttt{lib/services/seismic\_engine.dart} & \texttt{calculateSiteParameters()} (L7--114) \\
+Espectro Elástico $a_e(T)$ & \texttt{lib/services/seismic\_engine.dart} & \texttt{computeSpectrum()} (L145--153) \\
+Factores Inelásticos $Q'(T), R(T), R_0$ & \texttt{lib/services/seismic\_engine.dart} & \texttt{computeSpectrum()} (L118--165) \\
+Espectro de Diseño $a_d(T)$ y $a_{\text{mín}}$ & \texttt{lib/services/seismic\_engine.dart} & \texttt{computeSpectrum()} (L167--177) \\
+Espectro de Peligro Uniforme (EPU) & \texttt{lib/services/seismic\_engine.dart} & \texttt{computeSpectrum()} (L180--182) \\
+Comparativa Multicriterio ($Q=1.5, 2, 3, 4$) & \texttt{lib/services/seismic\_engine.dart} & \texttt{\_computeDesignForQ()} (L197--233) \\
+Espectros NTC-2004 (Cuerpo y Apéndice A) & \texttt{lib/services/seismic\_engine.dart} & \texttt{\_computeNtc2004Main()} (L235--302) \\
+Modelos de Datos y Constantes Normativas & \texttt{lib/models/seismic\_models.dart} & Definiciones de Enums y Clases \\
+Exportadores TXT (SAP2000), CSV y PDF & \texttt{lib/services/export\_service.dart} & \texttt{ExportService} (L8--180) \\
+Pruebas Unitarias de Validación Numérica & \texttt{test/seismic\_engine\_test.dart} & Suite de pruebas de precisión \\
+\bottomrule
+\end{tabular}
+\caption{Mapeo de formulaciones matemáticas contra el código fuente en Dart.}
+\end{table}
+
+\vspace{0.4cm}
+\begin{center}
+    \rule{0.6\linewidth}{0.5pt}\\[6pt]
+    \small\textsf{\textbf{SASID Pro} -- Desarrollado en Flutter para Ingeniería Sísmica y Estructural}\\
+    \small\textsf{Ciudad de México $\cdot$ 2026}
+\end{center}
+
+\end{document}
