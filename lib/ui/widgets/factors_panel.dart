@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/epoch.dart';
 import '../../models/seismic_models.dart';
 import '../theme/app_theme.dart';
+import 'section_header.dart';
 
 class FactorsPanel extends StatelessWidget {
   final SeismicFactors factors;
@@ -20,25 +21,15 @@ class FactorsPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
-              children: [
-                Icon(Icons.tune, size: 18, color: AppColors.accent),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Factores Sísmicos Estructurales',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textMain,
-                    ),
-                  ),
-                ),
-              ],
+            const SectionHeader(
+              icon: Icons.tune,
+              title: 'Factores Sísmicos Estructurales',
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
+            _sectionLabel('PARÁMETROS ESTRUCTURALES'),
+            const SizedBox(height: 8),
             _dropdownRow<ImportanceGroup>(
-              label: '1. Grupo de Importancia:',
+              label: '1. Grupo de Importancia',
               value: factors.importanceGroup,
               items: ImportanceGroup.values
                   .map(
@@ -46,7 +37,7 @@ class FactorsPanel extends StatelessWidget {
                       value: g,
                       child: Text(
                         '${g.name} (I=${g.factor})',
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12.5),
                       ),
                     ),
                   )
@@ -58,9 +49,9 @@ class FactorsPanel extends StatelessWidget {
                         onFactorsChanged(factors.copyWith(importanceGroup: v));
                     },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _dropdownRow<double>(
-              label: '2. Factor Q:',
+              label: '2. Factor Q',
               value: factors.q,
               items: [1.0, 1.5, 2.0, 3.0, 4.0]
                   .map(
@@ -68,7 +59,7 @@ class FactorsPanel extends StatelessWidget {
                       value: q,
                       child: Text(
                         'Q = $q',
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12.5),
                       ),
                     ),
                   )
@@ -77,9 +68,9 @@ class FactorsPanel extends StatelessWidget {
                 if (v != null) onFactorsChanged(factors.copyWith(q: v));
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _dropdownRow<IrregularityFactor>(
-              label: '3. Irregularidad α:',
+              label: '3. Irregularidad α',
               value: factors.irregularity,
               items: IrregularityFactor.values
                   .map(
@@ -87,7 +78,7 @@ class FactorsPanel extends StatelessWidget {
                       value: irr,
                       child: Text(
                         irr.name,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12.5),
                       ),
                     ),
                   )
@@ -99,9 +90,9 @@ class FactorsPanel extends StatelessWidget {
                         onFactorsChanged(factors.copyWith(irregularity: v));
                     },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _dropdownRow<double>(
-              label: '4. Hiperestaticidad k1:',
+              label: '4. Hiperestaticidad k1',
               value: factors.k1,
               items: [0.8, 1.0, 1.25]
                   .map(
@@ -109,7 +100,7 @@ class FactorsPanel extends StatelessWidget {
                       value: k,
                       child: Text(
                         'k1 = $k',
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12.5),
                       ),
                     ),
                   )
@@ -120,17 +111,19 @@ class FactorsPanel extends StatelessWidget {
                       if (v != null) onFactorsChanged(factors.copyWith(k1: v));
                     },
             ),
-            if (_locked)
-              const Padding(
-                padding: EdgeInsets.only(top: 6),
-                child: Text(
-                  'Comparación activa: Grupo/α/k1 bloqueados (=1.0) como en SASID original §3.3c',
-                  style: TextStyle(fontSize: 10, color: Colors.orange),
-                ),
+            if (_locked) ...[
+              const SizedBox(height: 10),
+              const InfoBanner(
+                icon: Icons.lock_outline,
+                message:
+                    'Comparación activa: Grupo / α / k1 bloqueados (=1.0), como en SASID original §3.3c',
               ),
-            const Divider(height: 16),
+            ],
+            const SizedBox(height: 14),
+            _sectionLabel('NORMATIVA Y ESPECTRO'),
+            const SizedBox(height: 8),
             _dropdownRow<NormVersion>(
-              label: 'Norma:',
+              label: 'Norma',
               value: factors.norm,
               items: NormVersion.values
                   .map(
@@ -138,7 +131,7 @@ class FactorsPanel extends StatelessWidget {
                       value: n,
                       child: Text(
                         n.label,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12.5),
                       ),
                     ),
                   )
@@ -147,9 +140,10 @@ class FactorsPanel extends StatelessWidget {
                 if (v != null) onFactorsChanged(factors.copyWith(norm: v));
               },
             ),
-            if (factors.norm == NormVersion.ntc2023)
+            if (factors.norm == NormVersion.ntc2023) ...[
+              const SizedBox(height: 10),
               _dropdownRow<PerformanceLevel>(
-                label: 'Nivel de desempeño:',
+                label: 'Nivel de desempeño',
                 value: factors.performanceLevel,
                 items: PerformanceLevel.values
                     .map(
@@ -157,7 +151,7 @@ class FactorsPanel extends StatelessWidget {
                         value: p,
                         child: Text(
                           p.label,
-                          style: const TextStyle(fontSize: 12),
+                          style: const TextStyle(fontSize: 12.5),
                         ),
                       ),
                     )
@@ -168,28 +162,56 @@ class FactorsPanel extends StatelessWidget {
                   }
                 },
               ),
+            ],
             if (factors.norm == NormVersion.ntc2023 &&
                 factors.performanceLevel == PerformanceLevel.ocupacionInmediata)
               const Padding(
-                padding: EdgeInsets.only(top: 4, bottom: 4),
-                child: Text(
-                  'Ocupación Inmediata: Q = 1 según numeral 3.2',
-                  style: TextStyle(fontSize: 10, color: Colors.orange),
+                padding: EdgeInsets.only(top: 10),
+                child: InfoBanner(
+                  icon: Icons.info_outline,
+                  message: 'Ocupación Inmediata: Q = 1 según numeral 3.2',
                 ),
               ),
-            SwitchListTile(
-              title: const Text(
-                'Mostrar EPU',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
               ),
-              value: factors.showEpu,
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              activeThumbColor: AppColors.accent,
-              onChanged: (v) => onFactorsChanged(factors.copyWith(showEpu: v)),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.show_chart_rounded,
+                    size: 16,
+                    color: factors.showEpu
+                        ? AppColors.spectrumEpu
+                        : AppColors.textFaint,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Mostrar EPU',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMain,
+                      ),
+                    ),
+                  ),
+                  Switch(
+                    value: factors.showEpu,
+                    activeThumbColor: AppColors.accent,
+                    onChanged: (v) =>
+                        onFactorsChanged(factors.copyWith(showEpu: v)),
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(height: 10),
             _dropdownRow(
-              label: 'Tr (EPU):',
+              label: 'Tr (EPU)',
               value: factors.returnPeriod,
               items: ReturnPeriod.values
                   .map(
@@ -197,7 +219,7 @@ class FactorsPanel extends StatelessWidget {
                       value: r,
                       child: Text(
                         r.label,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12.5),
                       ),
                     ),
                   )
@@ -207,8 +229,9 @@ class FactorsPanel extends StatelessWidget {
                   onFactorsChanged(factors.copyWith(returnPeriod: v));
               },
             ),
+            const SizedBox(height: 10),
             _dropdownRow(
-              label: 'Época/Malla:',
+              label: 'Época / Malla',
               value: factors.epoch,
               items: Epoch.values
                   .map(
@@ -216,7 +239,7 @@ class FactorsPanel extends StatelessWidget {
                       value: e,
                       child: Text(
                         '${e.label} (${e.hexCode})',
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12.5),
                       ),
                     ),
                   )
@@ -225,8 +248,9 @@ class FactorsPanel extends StatelessWidget {
                 if (v != null) onFactorsChanged(factors.copyWith(epoch: v));
               },
             ),
+            const SizedBox(height: 10),
             _dropdownRow(
-              label: 'Comparación NTC 2004:',
+              label: 'Comparación NTC 2004',
               value: factors.comparisonMode,
               items: ComparisonMode.values
                   .map(
@@ -234,7 +258,7 @@ class FactorsPanel extends StatelessWidget {
                       value: c,
                       child: Text(
                         c.label,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12.5),
                       ),
                     ),
                   )
@@ -253,8 +277,9 @@ class FactorsPanel extends StatelessWidget {
                 onFactorsChanged(locked);
               },
             ),
+            const SizedBox(height: 10),
             _dropdownRow(
-              label: 'Exportar espectro:',
+              label: 'Exportar espectro',
               value: factors.exportSpectrumType,
               items: SpectrumType.values
                   .map(
@@ -262,7 +287,7 @@ class FactorsPanel extends StatelessWidget {
                       value: s,
                       child: Text(
                         s.label,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12.5),
                       ),
                     ),
                   )
@@ -278,12 +303,25 @@ class FactorsPanel extends StatelessWidget {
     );
   }
 
+  Widget _sectionLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 10.5,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1,
+        color: AppColors.textFaint,
+      ),
+    );
+  }
+
   Widget _dropdownRow<T>({
     required String label,
     required T value,
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?>? onChanged,
   }) {
+    final disabled = onChanged == null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -295,18 +333,29 @@ class FactorsPanel extends StatelessWidget {
             color: AppColors.textMuted,
           ),
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 4),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: onChanged == null ? const Color(0xFFF1F5F9) : Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppColors.border),
+            color: disabled ? AppColors.chipBg : AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: disabled ? AppColors.border : AppColors.borderStrong,
+            ),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<T>(
               value: value,
               isExpanded: true,
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: disabled ? AppColors.textFaint : AppColors.accent,
+              ),
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              elevation: 8,
               items: items,
               onChanged: onChanged,
             ),

@@ -374,11 +374,18 @@ class _CdmxMapViewState extends State<CdmxMapView> {
             left: 8,
             right: 8,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.94),
-                borderRadius: BorderRadius.circular(6),
+                color: Colors.white.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.10),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: FittedBox(
                 fit: BoxFit.scaleDown,
@@ -389,9 +396,9 @@ class _CdmxMapViewState extends State<CdmxMapView> {
                       'Lomas (Ts ≤ 0.5s)',
                       GeotechnicalZone.zonaI.color,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     _legendItem('Transición', GeotechnicalZone.zonaII.color),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     _legendItem(
                       'Lago (Ts > 1.0s)',
                       GeotechnicalZone.zonaIIIc.color,
@@ -415,9 +422,16 @@ class _CdmxMapViewState extends State<CdmxMapView> {
     return Container(
       decoration: BoxDecoration(
         color: isActive ? AppColors.accent : Colors.white,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isActive ? AppColors.accent : AppColors.border,
+        ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 4),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: IconButton(

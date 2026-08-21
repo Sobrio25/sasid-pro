@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/seismic_models.dart';
 import '../theme/app_theme.dart';
+import 'section_header.dart';
 
 class SpectrumChart extends StatefulWidget {
   final SpectrumResult result;
@@ -22,9 +23,15 @@ class _SpectrumChartState extends State<SpectrumChart> {
   Widget build(BuildContext context) {
     final result = widget.result;
 
-    final designSpots = result.designSpectrum.map((p) => FlSpot(p.period, p.acceleration)).toList();
-    final elasticSpots = result.elasticSpectrum.map((p) => FlSpot(p.period, p.acceleration)).toList();
-    final epuSpots = result.epuSpectrum.map((p) => FlSpot(p.period, p.acceleration)).toList();
+    final designSpots = result.designSpectrum
+        .map((p) => FlSpot(p.period, p.acceleration))
+        .toList();
+    final elasticSpots = result.elasticSpectrum
+        .map((p) => FlSpot(p.period, p.acceleration))
+        .toList();
+    final epuSpots = result.epuSpectrum
+        .map((p) => FlSpot(p.period, p.acceleration))
+        .toList();
 
     final List<LineChartBarData> lineBars = [];
 
@@ -74,8 +81,12 @@ class _SpectrumChartState extends State<SpectrumChart> {
       );
     }
 
-    if (result.factors.showComparison2004 && result.ntc2004MainSpectrum != null && _showNtc2004) {
-      final ntc2004Spots = result.ntc2004MainSpectrum!.map((p) => FlSpot(p.period, p.acceleration)).toList();
+    if (result.factors.showComparison2004 &&
+        result.ntc2004MainSpectrum != null &&
+        _showNtc2004) {
+      final ntc2004Spots = result.ntc2004MainSpectrum!
+          .map((p) => FlSpot(p.period, p.acceleration))
+          .toList();
       lineBars.add(
         LineChartBarData(
           spots: ntc2004Spots,
@@ -89,38 +100,42 @@ class _SpectrumChartState extends State<SpectrumChart> {
       );
     }
 
-    double maxY = result.elasticSpectrum.map((p) => p.acceleration).reduce((a, b) => a > b ? a : b);
+    double maxY = result.elasticSpectrum
+        .map((p) => p.acceleration)
+        .reduce((a, b) => a > b ? a : b);
     if (result.factors.showEpu) maxY *= 1.15;
     maxY = ((maxY * 1.15) * 10).ceil() / 10.0;
     if (maxY < 0.5) maxY = 0.5;
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Icon(Icons.show_chart, size: 20, color: AppColors.accent),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Espectro de Respuesta Sísmica (Sa vs T)',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textMain),
-                    overflow: TextOverflow.ellipsis,
+            SectionHeader(
+              icon: Icons.show_chart,
+              title: 'Espectro de Respuesta Sísmica (Sa vs T)',
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.chipBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'T ∈ [0.0, 5.0 s]',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textMuted,
                   ),
                 ),
-                Text(
-                  'T ∈ [0.0, 5.0 s]',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted),
-                ),
-              ],
+              ),
             ),
             const SizedBox(height: 12),
 
             Wrap(
-              spacing: 12,
+              spacing: 8,
               runSpacing: 6,
               children: [
                 _legendToggle(
@@ -154,7 +169,7 @@ class _SpectrumChartState extends State<SpectrumChart> {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             SizedBox(
               height: 320,
@@ -169,42 +184,89 @@ class _SpectrumChartState extends State<SpectrumChart> {
                     drawVerticalLine: true,
                     horizontalInterval: maxY / 5,
                     verticalInterval: 0.5,
-                    getDrawingHorizontalLine: (value) => const FlLine(color: AppColors.border, strokeWidth: 0.8),
-                    getDrawingVerticalLine: (value) => const FlLine(color: AppColors.border, strokeWidth: 0.8),
+                    getDrawingHorizontalLine: (value) =>
+                        const FlLine(color: AppColors.border, strokeWidth: 1),
+                    getDrawingVerticalLine: (value) =>
+                        const FlLine(color: AppColors.border, strokeWidth: 1),
                   ),
                   titlesData: FlTitlesData(
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     bottomTitles: AxisTitles(
-                      axisNameWidget: const Text('Periodo Estructural T (segundos)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                      axisNameWidget: const Text(
+                        'Periodo Estructural T (segundos)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 26,
                         interval: 0.5,
-                        getTitlesWidget: (value, meta) => Text('${value.toStringAsFixed(1)}s', style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                        getTitlesWidget: (value, meta) => Text(
+                          '${value.toStringAsFixed(1)}s',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
                       ),
                     ),
                     leftTitles: AxisTitles(
-                      axisNameWidget: const Text('Aceleración Espectral Sa (g)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                      axisNameWidget: const Text(
+                        'Aceleración Espectral Sa (g)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 38,
                         interval: maxY / 5,
-                        getTitlesWidget: (value, meta) => Text(value.toStringAsFixed(2), style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                        getTitlesWidget: (value, meta) => Text(
+                          value.toStringAsFixed(2),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                   borderData: FlBorderData(
                     show: true,
-                    border: Border.all(color: AppColors.border),
+                    border: const Border(
+                      left: BorderSide(color: AppColors.borderStrong),
+                      bottom: BorderSide(color: AppColors.borderStrong),
+                    ),
                   ),
                   lineTouchData: LineTouchData(
                     touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => AppColors.primary,
+                      tooltipBorderRadius: BorderRadius.circular(8),
+                      tooltipPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       getTooltipItems: (touchedSpots) {
                         return touchedSpots.map((spot) {
+                          final color = spot.bar.color ?? Colors.white;
                           return LineTooltipItem(
                             'T: ${spot.x.toStringAsFixed(2)} s\nSa: ${spot.y.toStringAsFixed(4)} g',
-                            const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            TextStyle(
+                              color: color,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              height: 1.4,
+                            ),
                           );
                         }).toList();
                       },
@@ -229,9 +291,17 @@ class _SpectrumChartState extends State<SpectrumChart> {
   }) {
     return InkWell(
       onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: value ? color.withValues(alpha: 0.09) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: value ? color.withValues(alpha: 0.45) : AppColors.border,
+          ),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -239,17 +309,26 @@ class _SpectrumChartState extends State<SpectrumChart> {
               width: 16,
               height: 3,
               decoration: BoxDecoration(
-                color: value ? color : Colors.grey.shade400,
+                color: value ? color : AppColors.borderStrong,
                 borderRadius: BorderRadius.circular(2),
               ),
+              child: isDashed && value
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(
+                        3,
+                        (_) => Container(width: 3, color: color),
+                      ),
+                    )
+                  : null,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 7),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: value ? FontWeight.bold : FontWeight.normal,
-                color: value ? AppColors.textMain : AppColors.textMuted,
+                fontWeight: value ? FontWeight.w700 : FontWeight.w500,
+                color: value ? AppColors.textMain : AppColors.textFaint,
               ),
             ),
           ],

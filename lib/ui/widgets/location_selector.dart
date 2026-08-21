@@ -32,7 +32,6 @@ class LocationSelector extends StatefulWidget {
 class _LocationSelectorState extends State<LocationSelector> {
   late TextEditingController _latController;
   late TextEditingController _lonController;
-  final TextEditingController _searchController = TextEditingController();
   final TextEditingController _municipio = TextEditingController();
   final TextEditingController _calle = TextEditingController();
   final TextEditingController _numero = TextEditingController();
@@ -104,260 +103,346 @@ class _LocationSelectorState extends State<LocationSelector> {
     });
   }
 
+  IconData _iconFor(CoordinateMode m) {
+    switch (m) {
+      case CoordinateMode.punto:
+        return Icons.ads_click;
+      case CoordinateMode.coordenada:
+        return Icons.gps_fixed;
+      case CoordinateMode.direccion:
+        return Icons.location_city;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          height: 34,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(8),
+        SegmentedButton<CoordinateMode>(
+          segments: CoordinateMode.values
+              .map(
+                (m) => ButtonSegment(
+                  value: m,
+                  icon: Icon(_iconFor(m), size: 15),
+                  label: Text(m.label),
+                ),
+              )
+              .toList(),
+          selected: {widget.mode},
+          showSelectedIcon: false,
+          onSelectionChanged: (selection) =>
+              widget.onModeChanged(selection.first),
+        ),
+        const SizedBox(height: 12),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: _buildModeContent(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModeContent() {
+    switch (widget.mode) {
+      case CoordinateMode.punto:
+        return _puntoContent();
+      case CoordinateMode.coordenada:
+        return _coordenadaContent();
+      case CoordinateMode.direccion:
+        return _direccionContent();
+    }
+  }
+
+  Widget _puntoContent() {
+    return Row(
+      children: [
+        ElevatedButton.icon(
+          onPressed: () => widget.onPuntoChanged(!widget.puntoEnabled),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: widget.puntoEnabled
+                ? AppColors.accent
+                : AppColors.chipBg,
+            foregroundColor: widget.puntoEnabled
+                ? Colors.white
+                : AppColors.textMuted,
           ),
-          child: Row(
-            children: CoordinateMode.values
-                .map(
-                  (m) => Expanded(
-                    child: InkWell(
-                      onTap: () => widget.onModeChanged(m),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: widget.mode == m
-                              ? Colors.white
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          m.label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: widget.mode == m
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            color: widget.mode == m
-                                ? AppColors.accent
-                                : AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
+          icon: Icon(
+            widget.puntoEnabled
+                ? Icons.location_on
+                : Icons.location_off_outlined,
+            size: 16,
+          ),
+          label: Text(
+            widget.puntoEnabled ? 'Desactivar punto' : 'Activar punto',
           ),
         ),
-        const SizedBox(height: 10),
-        if (widget.mode == CoordinateMode.punto)
-          Row(
+        const SizedBox(width: 10),
+        Expanded(
+          child: Row(
             children: [
-              ElevatedButton.icon(
-                onPressed: () => widget.onPuntoChanged(!widget.puntoEnabled),
-                icon: Icon(
-                  widget.puntoEnabled ? Icons.location_on : Icons.location_off,
-                  size: 16,
-                ),
-                label: Text(
-                  widget.puntoEnabled ? 'Desactivar punto' : 'Activar punto',
-                ),
+              Icon(
+                Icons.touch_app,
+                size: 14,
+                color: widget.puntoEnabled
+                    ? AppColors.accent
+                    : AppColors.textFaint,
               ),
-              const SizedBox(width: 8),
-              Text(
-                widget.puntoEnabled
-                    ? 'Clic en el mapa para seleccionar'
-                    : 'Punto desactivado',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
-          ),
-        if (widget.mode == CoordinateMode.coordenada)
-          Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _latController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                        signed: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Latitud (°)',
-                        prefixIcon: Icon(Icons.north, size: 16),
-                      ),
-                      onSubmitted: (_) => _apply(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _lonController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                        signed: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Longitud (°)',
-                        prefixIcon: Icon(Icons.west, size: 16),
-                      ),
-                      onSubmitted: (_) => _apply(),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(_expanded ? Icons.remove : Icons.add),
-                    tooltip: _expanded ? 'Contraer' : 'Expandir',
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (!_expanded)
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _copyBoth,
-                      icon: const Icon(Icons.copy, size: 14),
-                      label: const Text(
-                        'Copiar ambas',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _pasteBoth,
-                      icon: const Icon(Icons.paste, size: 14),
-                      label: const Text(
-                        'Pegar ambas',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ],
-                ),
-              if (_expanded)
-                Text(
-                  'Pegar lat\\tlon desde Excel con tabulación',
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  widget.puntoEnabled
+                      ? 'Clic en el mapa para seleccionar'
+                      : 'Selección en mapa desactivada',
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     color: AppColors.textMuted,
                   ),
                 ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _apply,
-                  icon: const Icon(Icons.refresh, size: 16),
-                  label: const Text('Cambiar'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _coordenadaContent() {
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _latController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Latitud (°)',
+                  prefixIcon: Icon(Icons.north, size: 16),
+                ),
+                onSubmitted: (_) => _apply(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _lonController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Longitud (°)',
+                  prefixIcon: Icon(Icons.west, size: 16),
+                ),
+                onSubmitted: (_) => _apply(),
+              ),
+            ),
+            IconButton(
+              icon: Icon(_expanded ? Icons.unfold_less : Icons.unfold_more),
+              tooltip: _expanded ? 'Contraer opciones' : 'Más opciones',
+              color: AppColors.accent,
+              onPressed: () => setState(() => _expanded = !_expanded),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (!_expanded)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _copyBoth,
+                icon: const Icon(Icons.copy_rounded, size: 14),
+                label: const Text(
+                  'Copiar ambas',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _pasteBoth,
+                icon: const Icon(Icons.paste_rounded, size: 14),
+                label: const Text(
+                  'Pegar ambas',
+                  style: TextStyle(fontSize: 12),
                 ),
               ),
             ],
           ),
-        if (widget.mode == CoordinateMode.direccion)
-          Column(
-            children: [
-              DropdownButtonFormField<String>(
-                value: _municipio.text.isEmpty ? null : _municipio.text,
-                decoration: const InputDecoration(
-                  labelText: 'Municipio/Alcaldía',
+        if (_expanded)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.infoBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 13, color: AppColors.accent),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Pegue desde Excel con el formato lat\\tlon (tabulación)',
+                    style: TextStyle(fontSize: 10.5, color: AppColors.primary),
+                  ),
                 ),
-                items: CdmxPresets.alcaldias
-                    .map(
-                      (a) => DropdownMenuItem(
-                        value: a.name,
-                        child: Text(a.name, style: TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _apply,
+            icon: const Icon(Icons.check_rounded, size: 16),
+            label: const Text(
+              'Aplicar coordenadas',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _direccionContent() {
+    return Column(
+      children: [
+        DropdownButtonFormField<String>(
+          initialValue: _municipio.text.isEmpty ? null : _municipio.text,
+          decoration: const InputDecoration(
+            labelText: 'Municipio / Alcaldía',
+            prefixIcon: Icon(Icons.location_city, size: 16),
+          ),
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppColors.accent,
+          ),
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          items: CdmxPresets.alcaldias
+              .map(
+                (a) => DropdownMenuItem(
+                  value: a.name,
+                  child: Text(a.name, style: const TextStyle(fontSize: 12.5)),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            setState(() {
+              _municipio.text = v ?? '';
+            });
+          },
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextField(
+                controller: _calle,
+                decoration: const InputDecoration(labelText: 'Calle'),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              flex: 1,
+              child: TextField(
+                controller: _numero,
+                decoration: const InputDecoration(labelText: 'Número'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextField(
+                controller: _colonia,
+                decoration: const InputDecoration(labelText: 'Colonia'),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              flex: 1,
+              child: TextField(
+                controller: _cp,
+                decoration: const InputDecoration(labelText: 'CP'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _searchDireccion,
+            icon: _searching
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.search_rounded, size: 16),
+            label: const Text(
+              'Buscar dirección',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        if (_results.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: SizedBox(
+              height: 132,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: _results.length,
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 1, indent: 36),
+                itemBuilder: (c, i) {
+                  final it = _results[i];
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.place_outlined,
+                      size: 18,
+                      color: AppColors.accent,
+                    ),
+                    title: Text(
+                      it.displayName,
+                      style: const TextStyle(fontSize: 11.5),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      it.source,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textFaint,
                       ),
-                    )
-                    .toList(),
-                onChanged: (v) {
-                  _municipio.text = v ?? '';
+                    ),
+                    onTap: () =>
+                        widget.onLocationChanged(it.latitude, it.longitude),
+                  );
                 },
               ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _calle,
-                      decoration: const InputDecoration(labelText: 'Calle'),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  SizedBox(
-                    width: 90,
-                    child: TextField(
-                      controller: _numero,
-                      decoration: const InputDecoration(labelText: 'Número'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _colonia,
-                      decoration: const InputDecoration(labelText: 'Colonia'),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  SizedBox(
-                    width: 100,
-                    child: TextField(
-                      controller: _cp,
-                      decoration: const InputDecoration(labelText: 'CP'),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _searchDireccion,
-                  icon: _searching
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.search, size: 16),
-                  label: const Text('Buscar'),
-                ),
-              ),
-              if (_results.isNotEmpty)
-                SizedBox(
-                  height: 120,
-                  child: ListView.separated(
-                    itemCount: _results.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (c, i) {
-                      final it = _results[i];
-                      return ListTile(
-                        dense: true,
-                        title: Text(
-                          it.displayName,
-                          style: const TextStyle(fontSize: 11),
-                          maxLines: 2,
-                        ),
-                        subtitle: Text(
-                          it.source,
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                        onTap: () =>
-                            widget.onLocationChanged(it.latitude, it.longitude),
-                      );
-                    },
-                  ),
-                ),
-            ],
+            ),
           ),
+        ],
       ],
     );
   }

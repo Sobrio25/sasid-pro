@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../models/epoch.dart';
 import '../../models/seismic_models.dart';
 import '../theme/app_theme.dart';
+import 'section_header.dart';
 
 class DataTableView extends StatefulWidget {
   final SpectrumResult result;
@@ -13,6 +14,18 @@ class DataTableView extends StatefulWidget {
 
 class _DataTableViewState extends State<DataTableView> {
   SpectrumType _view = SpectrumType.design;
+
+  Color get _viewColor {
+    switch (_view) {
+      case SpectrumType.elastic:
+        return AppColors.spectrumElastic;
+      case SpectrumType.epu:
+        return AppColors.spectrumEpu;
+      case SpectrumType.design:
+        return AppColors.spectrumDesign;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     List<SpectrumPoint> pts;
@@ -33,51 +46,30 @@ class _DataTableViewState extends State<DataTableView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Row(
-                  children: [
-                    Icon(
-                      Icons.table_chart_outlined,
-                      size: 20,
-                      color: AppColors.accent,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Tabla de Valores Tabulados',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textMain,
-                      ),
-                    ),
-                  ],
-                ),
-                DropdownButton<SpectrumType>(
-                  value: _view,
-                  items: SpectrumType.values
-                      .map(
-                        (s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(
-                            s.label,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _view = v);
-                  },
-                ),
-              ],
+            SectionHeader(
+              icon: Icons.table_chart_outlined,
+              title: 'Tabla de Valores Tabulados',
             ),
+            const SizedBox(height: 12),
             Row(
               children: [
-                TextButton.icon(
-                  icon: const Icon(Icons.copy, size: 16),
-                  label: const Text('Copiar Tabla'),
+                Expanded(
+                  child: SegmentedButton<SpectrumType>(
+                    segments: SpectrumType.values
+                        .map(
+                          (s) => ButtonSegment(value: s, label: Text(s.label)),
+                        )
+                        .toList(),
+                    selected: {_view},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selection) =>
+                        setState(() => _view = selection.first),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.copy_rounded, size: 15),
+                  label: const Text('Copiar', style: TextStyle(fontSize: 12)),
                   onPressed: () {
                     final buf = StringBuffer(
                       'Periodo (s)\tSa ${_view.label} (g)\n',
@@ -92,83 +84,136 @@ class _DataTableViewState extends State<DataTableView> {
                     );
                   },
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'Mostrando: ${_view.label} | Tr ${widget.result.factors.returnPeriod.label}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textMuted,
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Container(
-              height: 220,
+              height: 240,
               decoration: BoxDecoration(
                 border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: ListView.separated(
-                itemCount: pts.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (c, i) {
-                  final pt = pts[i];
-                  final ptD = widget.result.designSpectrum[i];
-                  final ptE = widget.result.elasticSpectrum[i];
-                  return Padding(
+              child: Column(
+                children: [
+                  Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: const BoxDecoration(
+                      color: AppColors.chipBg,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(9),
+                        topRight: Radius.circular(9),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'T = ${pt.period.toStringAsFixed(3)} s',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textMain,
+                        const Text(
+                          'PERIODO T',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: AppColors.textMuted,
                           ),
                         ),
-                        Row(
-                          children: [
-                            Text(
-                              'Sa: ${pt.acceleration.toStringAsFixed(4)} g',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: _view == SpectrumType.design
-                                    ? AppColors.spectrumDesign
-                                    : _view == SpectrumType.elastic
-                                    ? AppColors.spectrumElastic
-                                    : AppColors.spectrumEpu,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            if (_view != SpectrumType.design)
-                              Text(
-                                'Sa_d: ${ptD.acceleration.toStringAsFixed(4)}',
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                            if (_view != SpectrumType.elastic)
-                              Text(
-                                ' Sa_e: ${ptE.acceleration.toStringAsFixed(4)}',
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                          ],
+                        Text(
+                          'Sa ${_view.label.toUpperCase()}',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: _viewColor,
+                          ),
                         ),
                       ],
                     ),
-                  );
-                },
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: pts.length,
+                      itemBuilder: (c, i) {
+                        final pt = pts[i];
+                        final ptD = widget.result.designSpectrum[i];
+                        final ptE = widget.result.elasticSpectrum[i];
+                        final isEven = i.isEven;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
+                          color: isEven
+                              ? Colors.transparent
+                              : AppColors.surface.withValues(alpha: 0.7),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${pt.period.toStringAsFixed(3)} s',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: [FontFeature.tabularFigures()],
+                                  color: AppColors.textMain,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    pt.acceleration.toStringAsFixed(4),
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      fontFeatures: [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                      color: _viewColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  if (_view != SpectrumType.design)
+                                    Text(
+                                      'd ${ptD.acceleration.toStringAsFixed(4)}',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontFeatures: [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                        color: AppColors.textFaint,
+                                      ),
+                                    ),
+                                  if (_view != SpectrumType.design)
+                                    const SizedBox(width: 8),
+                                  if (_view != SpectrumType.elastic)
+                                    Text(
+                                      'e ${ptE.acceleration.toStringAsFixed(4)}',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontFeatures: [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                        color: AppColors.textFaint,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Mostrando: ${_view.label} · Tr ${widget.result.factors.returnPeriod.label} · ${pts.length} puntos',
+              style: const TextStyle(
+                fontSize: 10.5,
+                color: AppColors.textFaint,
               ),
             ),
           ],
