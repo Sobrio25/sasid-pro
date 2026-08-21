@@ -36,7 +36,7 @@ class _CdmxMapViewState extends State<CdmxMapView> {
   final MapController _mapController = MapController();
   bool _showZoneOverlays = true;
   List<List<LatLng>> _municipios = [];
-  List<ZonaGeo> _zonas = [];
+  final Map<String, List<ZonaPolygon>> _zonas = {};
   LatLng? _mousePos;
   LatLng _initialCenter = const LatLng(19.432608, -99.133208);
   @override
@@ -53,8 +53,11 @@ class _CdmxMapViewState extends State<CdmxMapView> {
   }
 
   Future<void> _loadZonas() async {
-    final z = await MapService.loadZonasGeotecnica();
-    if (mounted) setState(() => _zonas = z);
+    for (final z in MapService.zonas) {
+      final polys = await MapService.loadZona(z);
+      if (!mounted) return;
+      setState(() => _zonas[z] = polys);
+    }
   }
 
   /// Color oficial por zona geotécnica NTC.
@@ -162,22 +165,27 @@ class _CdmxMapViewState extends State<CdmxMapView> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.sasid.app',
               ),
-              // Zonificación geotécnica oficial NTC-2017 (GeoJSON).
+              // Zonificación geotécnica oficial NTC-2017: 3 capas separadas
+              // (III abajo, II, I encima) con agujeros vía holePoints.
               if (_showZoneOverlays &&
                   widget.showLomasDivision &&
                   _zonas.isNotEmpty)
-                PolygonLayer(
-                  polygons: [
-                    for (final z in _zonas)
-                      for (final ring in z.rings)
-                        Polygon(
-                          points: ring,
-                          color: _colorForZona(z.zona).withValues(alpha: 0.18),
-                          borderColor: _colorForZona(z.zona),
-                          borderStrokeWidth: 1.5,
-                        ),
-                  ],
-                ),
+                for (final zonaKey in MapService.zonas.reversed)
+                  if ((_zonas[zonaKey] ?? []).isNotEmpty)
+                    PolygonLayer(
+                      polygons: [
+                        for (final poly in _zonas[zonaKey]!)
+                          Polygon(
+                            points: poly.outer,
+                            holePointsList: poly.holes,
+                            color: _colorForZona(
+                              'Zona $zonaKey',
+                            ).withValues(alpha: 0.18),
+                            borderColor: _colorForZona('Zona $zonaKey'),
+                            borderStrokeWidth: 1.5,
+                          ),
+                      ],
+                    ),
               if (widget.showMunicipios && _municipios.isNotEmpty)
                 PolygonLayer(
                   polygons: _municipios

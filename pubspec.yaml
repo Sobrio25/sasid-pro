@@ -93,7 +93,9 @@ flutter:
     - assets/Mapa/Area17.txt
     - assets/Mapa/DF_Nodo.txt
     - assets/Mapa/NTC04-Zonas.txt
-    - assets/geojson/zonificacion_geotecnica_2017.geojson
+    - assets/geojson/zona_i.geojson
+    - assets/geojson/zona_ii.geojson
+    - assets/geojson/zona_iii.geojson
 
   # To add assets to your application, add an assets section, like this:
   # assets:

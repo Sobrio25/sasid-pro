@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sasid_app/models/seismic_models.dart';
-import 'package:sasid_app/models/epoch.dart';
 import 'package:sasid_app/services/map_service.dart';
 import 'package:sasid_app/services/seismic_engine.dart';
 

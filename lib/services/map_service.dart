@@ -3,95 +3,92 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 
-/// Polígono de zonificación geotécnica oficial con sus anillos exteriores.
-class ZonaGeo {
-  final String zona; // 'Zona I' | 'Zona II' | 'Zona III'
-  final String nombre;
-  final List<List<LatLng>> rings;
+/// Un polígono con anillo exterior y agujeros (islotes recortados).
+class ZonaPolygon {
+  final List<LatLng> outer;
+  final List<List<LatLng>> holes;
 
-  const ZonaGeo({
-    required this.zona,
-    required this.nombre,
-    required this.rings,
-  });
+  const ZonaPolygon({required this.outer, required this.holes});
 }
 
+/// Capa de zonificación geotécnica oficial NTC-2017.
+///
+/// Cada zona vive en su propio GeoJSON (`assets/geojson/zona_{i,ii,iii}.geojson`)
+/// convertido del ShapeFile oficial (Mexico ITRF2008 / UTM 14N -> WGS84).
+/// Según la especificación ESRI los anillos CW son exteriores y los CCW
+/// agujeros; el GeoJSON conserva esa estructura como [exterior, agujero...].
 class MapService {
-  /// Zonificación geotécnica oficial NTC-2017 desde GeoJSON (WGS84).
-  static List<ZonaGeo>? _zonasCache;
+  static const List<String> zonas = ['I', 'II', 'III'];
 
-  static Future<List<ZonaGeo>> loadZonasGeotecnica() async {
-    if (_zonasCache != null) return _zonasCache!;
+  static final Map<String, List<ZonaPolygon>> _cache = {};
+
+  /// Carga la capa de una zona ('I' | 'II' | 'III') con cache.
+  static Future<List<ZonaPolygon>> loadZona(String zona) async {
+    if (_cache.containsKey(zona)) return _cache[zona]!;
     try {
       final txt = await rootBundle.loadString(
-        'assets/geojson/zonificacion_geotecnica_2017.geojson',
+        'assets/geojson/zona_${zona.toLowerCase()}.geojson',
       );
       final data = jsonDecode(txt) as Map<String, dynamic>;
       final features = data['features'] as List<dynamic>;
-      final List<ZonaGeo> out = [];
+      final List<ZonaPolygon> out = [];
       for (final f in features) {
-        final props = f['properties'] as Map<String, dynamic>;
         final geom = f['geometry'] as Map<String, dynamic>;
-
-        // Polygon: coordinates es [[anillo],[agujero]...]
-        // MultiPolygon: coordinates es [[[anillo]...],[...]...]
-        final List<dynamic> ringsRaw;
+        // Polygon: [exterior, agujero...] | MultiPolygon: [[ext, huecos]...]
+        final List<dynamic> polygonsRaw;
         switch (geom['type'] as String) {
           case 'Polygon':
-            ringsRaw = geom['coordinates'] as List<dynamic>;
+            polygonsRaw = [geom['coordinates'] as List<dynamic>];
             break;
           case 'MultiPolygon':
-            ringsRaw = (geom['coordinates'] as List<dynamic>)
-                .expand((p) => p as List<dynamic>)
-                .toList();
+            polygonsRaw = geom['coordinates'] as List<dynamic>;
             break;
           default:
             continue;
         }
-        if (ringsRaw.isEmpty) continue;
-
-        final rings = <List<LatLng>>[];
-        for (final ring in ringsRaw) {
-          final pts = (ring as List<dynamic>)
-              .map(
-                (c) =>
-                    LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
-              )
-              .toList();
-          if (pts.length >= 3) rings.add(pts);
+        for (final ringsRaw in polygonsRaw) {
+          final rings = ringsRaw as List<dynamic>;
+          if (rings.isEmpty) continue;
+          final outer = _toLatLng(rings[0]);
+          if (outer.length < 3) continue;
+          final holes = <List<LatLng>>[];
+          for (var i = 1; i < rings.length; i++) {
+            final h = _toLatLng(rings[i]);
+            if (h.length >= 3) holes.add(h);
+          }
+          out.add(ZonaPolygon(outer: outer, holes: holes));
         }
-        if (rings.isEmpty) continue;
-
-        out.add(
-          ZonaGeo(
-            zona: props['zona']?.toString() ?? '',
-            nombre: props['nombre']?.toString() ?? '',
-            rings: rings,
-          ),
-        );
       }
+      _cache[zona] = out;
       return out;
     } catch (_) {
-      _zonasCache ??= const [];
-      return _zonasCache!;
+      _cache[zona] ??= const [];
+      return _cache[zona]!;
     }
   }
 
-  /// Zona geotécnica oficial en el punto dado mediante ray-casting sobre
-  /// los polígonos del GeoJSON: 'Zona I' | 'Zona II' | 'Zona III' | null.
+  /// Zona geotécnica oficial en el punto dado: 'Zona I' | 'Zona II' |
+  /// 'Zona III' | null (fuera de cobertura).
   ///
-  /// Los polígonos se traslapan (el lago no recorta sus islotes rocosos),
-  /// así que se evalúan en orden INVERSO al archivo: las zonas específicas
-  /// dibujadas encima (I, II) tienen precedencia sobre la envolvente (III).
+  /// Prioridad I > II > III: las zonas específicas tienen precedencia sobre
+  /// la envolvente del lago. Un punto cuenta dentro solo si cae en el anillo
+  /// exterior y NO en ninguno de sus agujeros.
   static Future<String?> zoneAtPoint(double lat, double lon) async {
-    final zonas = await loadZonasGeotecnica();
-    for (final z in zonas.reversed) {
-      for (final ring in z.rings) {
-        if (_pointInRing(lat, lon, ring)) return z.zona;
+    for (final z in zonas) {
+      final polys = await loadZona(z);
+      for (final poly in polys) {
+        if (_pointInRing(lat, lon, poly.outer) &&
+            !poly.holes.any((h) => _pointInRing(lat, lon, h))) {
+          return 'Zona $z';
+        }
       }
     }
     return null;
   }
+
+  static List<LatLng> _toLatLng(List<dynamic> ring) => ring
+      .map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+      .toList();
 
   /// Ray-casting estándar punto-en-polígono.
   static bool _pointInRing(double lat, double lon, List<LatLng> ring) {

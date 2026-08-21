@@ -4,95 +4,103 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:sasid_app/services/map_service.dart';
 
-void main() {
-  // Reproduce la lógica de parseo de loadZonasGeotecnica sin depender del
-  // asset, para validar Polygon y MultiPolygon.
-  List<ZonaGeo> parseGeoJson(String txt) {
-    final data = jsonDecode(txt) as Map<String, dynamic>;
-    final features = data['features'] as List<dynamic>;
-    final out = <ZonaGeo>[];
-    for (final f in features) {
-      final props = f['properties'] as Map<String, dynamic>;
-      final geom = f['geometry'] as Map<String, dynamic>;
-      final List<dynamic> ringsRaw;
-      switch (geom['type'] as String) {
-        case 'Polygon':
-          ringsRaw = geom['coordinates'] as List<dynamic>;
-          break;
-        case 'MultiPolygon':
-          ringsRaw = (geom['coordinates'] as List<dynamic>)
-              .expand((p) => p as List<dynamic>)
-              .toList();
-          break;
-        default:
-          continue;
-      }
-      if (ringsRaw.isEmpty) continue;
-      final rings = <List<LatLng>>[];
-      for (final ring in ringsRaw) {
-        final pts = (ring as List<dynamic>)
+// Reproduce la lógica de parseo de MapService.loadZona sin depender del
+// asset, validando Polygon/MultiPolygon y anillos de agujeros.
+List<ZonaPolygon> parseGeoJson(String txt) {
+  final data = jsonDecode(txt) as Map<String, dynamic>;
+  final features = data['features'] as List<dynamic>;
+  final out = <ZonaPolygon>[];
+  for (final f in features) {
+    final geom = f['geometry'] as Map<String, dynamic>;
+    final List<dynamic> polygonsRaw;
+    switch (geom['type'] as String) {
+      case 'Polygon':
+        polygonsRaw = [geom['coordinates'] as List<dynamic>];
+        break;
+      case 'MultiPolygon':
+        polygonsRaw = geom['coordinates'] as List<dynamic>;
+        break;
+      default:
+        continue;
+    }
+    for (final ringsRaw in polygonsRaw) {
+      final rings = ringsRaw as List<dynamic>;
+      if (rings.isEmpty) continue;
+      final outer = (rings[0] as List<dynamic>)
+          .map(
+            (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+          )
+          .toList();
+      if (outer.length < 3) continue;
+      final holes = <List<LatLng>>[];
+      for (var i = 1; i < rings.length; i++) {
+        final h = (rings[i] as List<dynamic>)
             .map(
               (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
             )
             .toList();
-        if (pts.length >= 3) rings.add(pts);
+        if (h.length >= 3) holes.add(h);
       }
-      if (rings.isEmpty) continue;
-      out.add(
-        ZonaGeo(
-          zona: props['zona']?.toString() ?? '',
-          nombre: props['nombre']?.toString() ?? '',
-          rings: rings,
-        ),
-      );
+      out.add(ZonaPolygon(outer: outer, holes: holes));
     }
-    return out;
   }
+  return out;
+}
 
-  group('MapService GeoJSON parser', () {
-    test('Parsea Polygon con coordenadas [lon,lat]', () {
+void main() {
+  group('MapService parser GeoJSON por zona', () {
+    test('Parsea Polygon simple sin agujeros', () {
       const txt =
           '{"type":"FeatureCollection","features":[{"type":"Feature",'
-          '"properties":{"zona":"Zona I","nombre":"Zona firme de lomas"},'
+          '"properties":{"zona":"Zona I"},'
           '"geometry":{"type":"Polygon","coordinates":[['
           '[-99.30,19.15],[-98.85,19.15],[-98.85,19.60],[-99.30,19.60],'
           '[-99.30,19.15]]]}}]}';
-      final zonas = parseGeoJson(txt);
-      expect(zonas.length, 1);
-      expect(zonas.first.zona, 'Zona I');
-      expect(zonas.first.rings.length, 1);
-      final ring = zonas.first.rings.first;
-      expect(ring.length, 5);
-      // GeoJSON es [lon,lat]; LatLng es (lat,lon)
-      expect(ring.first.latitude, 19.15);
-      expect(ring.first.longitude, -99.30);
+      final polys = parseGeoJson(txt);
+      expect(polys.length, 1);
+      expect(polys.first.outer.length, 5);
+      expect(polys.first.holes, isEmpty);
+      expect(polys.first.outer.first.latitude, 19.15);
+      expect(polys.first.outer.first.longitude, -99.30);
     });
 
-    test('Parsea MultiPolygon aplanando anillos', () {
+    test('MultiPolygon genera varios ZonaPolygon', () {
       const txt =
           '{"type":"FeatureCollection","features":[{"type":"Feature",'
-          '"properties":{"zona":"Zona II","nombre":"Zona de transición"},'
+          '"properties":{"zona":"Zona II"},'
           '"geometry":{"type":"MultiPolygon","coordinates":['
           '[[[-99.20,19.40],[-99.10,19.40],[-99.10,19.45],[-99.20,19.45],'
           '[-99.20,19.40]]],'
           '[[[-99.15,19.50],[-99.05,19.50],[-99.05,19.55],[-99.15,19.55],'
           '[-99.15,19.50]]]'
           ']}}]}';
-      final zonas = parseGeoJson(txt);
-      expect(zonas.length, 1);
-      expect(zonas.first.rings.length, 2);
-      expect(zonas.first.rings[1].first.latitude, 19.50);
+      final polys = parseGeoJson(txt);
+      expect(polys.length, 2);
+      expect(polys[1].outer.first.latitude, 19.50);
     });
 
-    test('Ignora anillos degenerados (<3 puntos)', () {
+    test('Primer anillo exterior, siguientes son agujeros', () {
       const txt =
           '{"type":"FeatureCollection","features":[{"type":"Feature",'
           '"properties":{"zona":"Zona III"},'
+          '"geometry":{"type":"Polygon","coordinates":[['
+          '[-99.2,19.2],[-98.9,19.2],[-98.9,19.6],[-99.2,19.6],[-99.2,19.2]],'
+          '[[-99.09,19.43],[-99.08,19.43],[-99.08,19.44],[-99.09,19.44],'
+          '[-99.09,19.43]]]'
+          '}}]}';
+      final polys = parseGeoJson(txt);
+      expect(polys.length, 1);
+      expect(polys.first.holes.length, 1);
+      expect(polys.first.holes.first.first.latitude, 19.43);
+    });
+
+    test('Anillo exterior degenerado descarta el polígono', () {
+      const txt =
+          '{"type":"FeatureCollection","features":[{"type":"Feature",'
+          '"properties":{"zona":"Zona I"},'
           '"geometry":{"type":"Polygon","coordinates":[[[-99.1,19.3]],['
           '[-99.1,19.3],[-99.0,19.3],[-99.0,19.35],[-99.1,19.3]]]}}]}';
-      final zonas = parseGeoJson(txt);
-      expect(zonas.length, 1);
-      expect(zonas.first.rings.length, 1); // solo el anillo válido
+      expect(parseGeoJson(txt), isEmpty);
     });
   });
 }
