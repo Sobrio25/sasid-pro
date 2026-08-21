@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/epoch.dart';
 import '../../models/seismic_models.dart';
@@ -38,6 +39,8 @@ class _CdmxMapViewState extends State<CdmxMapView> {
   List<List<LatLng>> _municipios = [];
   final Map<String, List<ZonaPolygon>> _zonas = {};
   LatLng? _mousePos;
+  LatLng? _userPos;
+  bool _locatingUser = false;
   LatLng _initialCenter = const LatLng(19.432608, -99.133208);
   @override
   void initState() {
@@ -72,8 +75,52 @@ class _CdmxMapViewState extends State<CdmxMapView> {
     }
   }
 
-  void _centerCdmx() {
-    _mapController.move(const LatLng(19.432608, -99.133208), 11.2);
+  /// Solicita permiso y obtiene la posición del usuario. Con permiso
+  /// concedido muestra un marcador azul y centra el mapa en él.
+  Future<void> _locateUser() async {
+    if (_locatingUser) return;
+    void fail(String msg) {
+      if (!mounted) return;
+      setState(() {
+        _locatingUser = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.orange),
+      );
+    }
+
+    setState(() {
+      _locatingUser = true;
+    });
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.unableToDetermine) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied) {
+        fail('Permiso de ubicación denegado');
+        return;
+      }
+      if (perm == LocationPermission.deniedForever) {
+        fail('Permiso denegado permanentemente: habilítalo en ajustes');
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+        ),
+      );
+      final userLatLng = LatLng(pos.latitude, pos.longitude);
+      if (!mounted) return;
+      _mapController.move(userLatLng, 14);
+      setState(() {
+        _userPos = userLatLng;
+        _locatingUser = false;
+      });
+    } catch (_) {
+      fail('No se pudo obtener la ubicación');
+    }
   }
 
   void _resetPosition() {
@@ -242,6 +289,27 @@ class _CdmxMapViewState extends State<CdmxMapView> {
                       ],
                     ),
                   ),
+                  if (_userPos != null)
+                    Marker(
+                      point: _userPos!,
+                      width: 26,
+                      height: 26,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: const BoxDecoration(
+                            color: AppColors.accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               // Atribución obligatoria según OSM Tile Usage Policy.
@@ -258,9 +326,12 @@ class _CdmxMapViewState extends State<CdmxMapView> {
             child: Column(
               children: [
                 _mapBtn(
-                  icon: Icons.my_location,
-                  tooltip: 'Centrar CDMX',
-                  onPressed: _centerCdmx,
+                  icon: _locatingUser
+                      ? Icons.location_searching
+                      : Icons.my_location,
+                  tooltip: 'Mi ubicación',
+                  onPressed: _locateUser,
+                  isActive: _userPos != null,
                 ),
                 const SizedBox(height: 6),
                 _mapBtn(
