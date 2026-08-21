@@ -65,8 +65,8 @@ $$
 
 1. **Clonar el repositorio:**
    ```bash
-   git clone https://github.com/Sobrio25/espectra-cdmx.git
-   cd espectra-cdmx
+   git clone https://github.com/Sobrio25/sasid-pro.git
+   cd sasid-pro
    ```
 
 2. **Instalar dependencias:**
