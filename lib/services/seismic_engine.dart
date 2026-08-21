@@ -5,11 +5,17 @@ import 'grd_service.dart';
 
 /// Motor de cálculo de espectros NTC-CDMX.
 ///
-/// Modo 2016 (SASID A v3.3): parámetros del sitio interpolados desde las
-/// mallas `ES_DF{época}.grd` (Ts) y tablas continuas del lago; el espectro de
-/// diseño reduce el elástico con X(T) = R0 + 0.5·(1 − √(T/Ta)), R0 = 1.75.
+/// Las tres normas derivan los parámetros del sitio (Ts, a0, c, Ta, Tb, k)
+/// del mismo modelo continuo SASID interpolado de las mallas `ES_DF{época}.grd`
+/// (numeral 3.1.2, idéntico en 2017 y 2023). Solo difieren en la reducción:
 ///
-/// Modo 2017/2023: tablas normativas por zona y reducción Q'(T)·R(T)·α.
+/// - 2016 (SASID A v3.3, réplica binaria): X(T) = R0 + 0.5·(1 − √(T/Ta)),
+///   R0 = 1.75, cola elástica con k fijo.
+/// - 2017 (ec. 3.4.1 + 3.5.1): ad = I·ae/(Q'(T)·R), Q' con raíces,
+///   R = k1·R0 + k2, irregularidad corrige Q' (sec. 5.5).
+/// - 2023 (ec. 3.2.1 + 3.3.1): igual que 2017 más niveles de desempeño
+///   (SV: R'=R; OI: R'=0.75R con Q=1) y sin corrección de irregularidad
+///   en el espectro.
 class SeismicEngine {
   /// Puntos de calibración del modelo continuo 2016 (lago profundo),
   /// extraídos de SASID A v3.3: (Ts, a0, c, Ta/Ts, Tb/Ts, k).
@@ -258,12 +264,9 @@ class SeismicEngine {
       final rTotal = rTotalNorm(q: qNorm, k1: factors.k1, ta_: site.ta, t: t);
       final rPrime = rTotal * factors.performanceLevel.rFactor;
 
-      double ad = (iFactor * ae) / (qp * rPrime);
-      final double aMin =
-          (site.a0 * iFactor) /
-          (2.0 *
-              rTotalNorm(q: qNorm, k1: factors.k1, ta_: site.ta, t: site.ta));
-      if (ad < aMin) ad = aMin;
+      // Sin piso a_min: no existe en los numerales 3.x de la norma;
+      // Q'(T->0)=1 y R(0)=k1*R0+0.5 dan el arranque correcto.
+      final double ad = (iFactor * ae) / (qp * rPrime);
 
       if (ad > aMaxDesign) aMaxDesign = ad;
       design.add(SpectrumPoint(period: t, acceleration: ad));
@@ -320,13 +323,14 @@ class SeismicEngine {
       elastic.add(SpectrumPoint(period: t, acceleration: ae));
 
       // Reducción 2016: X(T) = R0 + 0.5·(1 − √(T/Ta)) en rama ascendente,
-      // R0 puro en meseta y descendente.
+      // R0 puro en meseta y descendente. El factor de importancia I afecta
+      // el diseño (manual SASID A: el espectro depende de los factores).
       double xFactor = r0;
       if (t < site.ta && site.ta > 0) {
         xFactor = r0 + 0.5 * (1 - math.sqrt(t / site.ta));
       }
 
-      double ad = ae / xFactor;
+      double ad = (iFactor * ae) / xFactor;
       final double aMin = site.a0 / (2.0 * r0);
       if (ad < aMin) ad = aMin;
 
