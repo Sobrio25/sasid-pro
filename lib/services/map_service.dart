@@ -29,28 +29,36 @@ class MapService {
       for (final f in features) {
         final props = f['properties'] as Map<String, dynamic>;
         final geom = f['geometry'] as Map<String, dynamic>;
+
+        // Polygon: coordinates es [[anillo],[agujero]...]
+        // MultiPolygon: coordinates es [[[anillo]...],[...]...]
         final List<dynamic> ringsRaw;
-        if (geom['type'] == 'Polygon') {
-          ringsRaw = [geom['coordinates'] as List<dynamic>];
-        } else if (geom['type'] == 'MultiPolygon') {
-          ringsRaw = (geom['coordinates'] as List<dynamic>)
-              .expand((p) => p as List<dynamic>)
-              .toList();
-        } else {
-          continue;
+        switch (geom['type'] as String) {
+          case 'Polygon':
+            ringsRaw = geom['coordinates'] as List<dynamic>;
+            break;
+          case 'MultiPolygon':
+            ringsRaw = (geom['coordinates'] as List<dynamic>)
+                .expand((p) => p as List<dynamic>)
+                .toList();
+            break;
+          default:
+            continue;
         }
-        final rings = ringsRaw
-            .map(
-              (ring) => (ring as List<dynamic>)
-                  .map(
-                    (c) => LatLng(
-                      (c[1] as num).toDouble(),
-                      (c[0] as num).toDouble(),
-                    ),
-                  )
-                  .toList(),
-            )
-            .toList();
+        if (ringsRaw.isEmpty) continue;
+
+        final rings = <List<LatLng>>[];
+        for (final ring in ringsRaw) {
+          final pts = (ring as List<dynamic>)
+              .map(
+                (c) =>
+                    LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+              )
+              .toList();
+          if (pts.length >= 3) rings.add(pts);
+        }
+        if (rings.isEmpty) continue;
+
         out.add(
           ZonaGeo(
             zona: props['zona']?.toString() ?? '',
