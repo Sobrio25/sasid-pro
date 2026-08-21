@@ -73,9 +73,11 @@ class ParametersCard extends StatelessWidget {
                   isHighlighted: true,
                 ),
                 _paramTile(
-                  'R0 (sobrerr.)',
+                  'R (sobrerr.)',
                   result.r0.toStringAsFixed(2),
-                  'Factor de sobrerresistencia base',
+                  result.factors.norm == NormVersion.ntc2016
+                      ? 'Sobrerresistencia fija del SASID 2016'
+                      : 'R = k1·R0 + k2 en meseta (k2 = 0)',
                   Colors.green,
                 ),
               ],

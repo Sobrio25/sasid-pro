@@ -81,6 +81,14 @@ enum ImportanceGroup {
     description:
         'Viviendas, oficinas, comercios, hoteles e industrias estándar.',
   ),
+  grupoA2(
+    name: 'Subgrupo A2 (NTC 2017)',
+    factor: 1.3,
+    code: 'A2',
+    description:
+        'Edificaciones con sustancias inflamables o tóxicas en cantidades '
+        'intermedias (numeral 3.3 NTC-2017 / Art. 139 Reglamento).',
+  ),
   grupoA1(
     name: 'Grupo A1 (Especiales / NTC 2023)',
     factor: 1.75,
@@ -103,15 +111,34 @@ enum ImportanceGroup {
 }
 
 enum IrregularityFactor {
-  regular(name: 'Regular (α = 1.0)', factor: 1.0),
+  regular(name: 'Regular', factor: 1.0),
   irregular(name: 'Irregular (α = 0.9)', factor: 0.9),
-  fuertementeIrregular(name: 'Fuertemente Irregular (α = 0.8)', factor: 0.8),
-  muyIrregular(name: 'Extremadamente Irregular (α = 0.7)', factor: 0.7);
+  fuertementeIrregular(name: 'Irregular (corr. Q\' × 0.8)', factor: 0.8),
+  muyIrregular(name: 'Muy Irregular (corr. Q\' × 0.7)', factor: 0.7);
 
   final String name;
   final double factor;
 
   const IrregularityFactor({required this.name, required this.factor});
+
+  /// Opciones aplicables según la norma seleccionada.
+  ///
+  /// - NTC 2016 (SASID A): cuatro niveles de α divisor (1.0/0.9/0.8/0.7).
+  /// - NTC 2017/2023 (sec. 5.5): solo Regular, Irregular (×0.8) y
+  ///   Muy irregular (×0.7) como corrección de Q'.
+  static List<IrregularityFactor> optionsFor(NormVersion norm) {
+    switch (norm) {
+      case NormVersion.ntc2016:
+        return IrregularityFactor.values;
+      case NormVersion.ntc2017:
+      case NormVersion.ntc2023:
+        return [
+          IrregularityFactor.regular,
+          IrregularityFactor.fuertementeIrregular,
+          IrregularityFactor.muyIrregular,
+        ];
+    }
+  }
 }
 
 class SeismicFactors {

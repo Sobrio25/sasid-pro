@@ -70,9 +70,16 @@ class FactorsPanel extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             _dropdownRow<IrregularityFactor>(
-              label: '3. Irregularidad α',
-              value: factors.irregularity,
-              items: IrregularityFactor.values
+              label: factors.norm == NormVersion.ntc2016
+                  ? '3. Irregularidad α'
+                  : "3. Irregularidad (corrección Q')",
+              value:
+                  IrregularityFactor.optionsFor(
+                    factors.norm,
+                  ).contains(factors.irregularity)
+                  ? factors.irregularity
+                  : IrregularityFactor.regular,
+              items: IrregularityFactor.optionsFor(factors.norm)
                   .map(
                     (irr) => DropdownMenuItem(
                       value: irr,

@@ -58,6 +58,73 @@ void main() {
       expect(result.aMaxDesign, greaterThan(0.0));
     });
 
+    test('NTC 2017 oficial: elástico con p(T), Q\' raíz y R=k1·R0+k2', () {
+      // Sitio con parámetros conocidos: Ts=1.335 -> Ta=1.080, Tb=1.719, k=0.56,
+      // a0=0.301, c=0.947 (calibración SASID).
+      final site = SeismicEngine.params2016ForTs(1.335);
+      const factors = SeismicFactors(
+        importanceGroup: ImportanceGroup.grupoB,
+        q: 2.0,
+        irregularity: IrregularityFactor.regular,
+        k1: 1.0,
+        norm: NormVersion.ntc2017,
+      );
+      final result = SeismicEngine.computeSpectrum(
+        site: site,
+        factors: factors,
+      );
+
+      double designAt(double t) =>
+          result.designSpectrum[(t / 0.02).round()].acceleration;
+      double elasticAt(double t) =>
+          result.elasticSpectrum[(t / 0.02).round()].acceleration;
+
+      // --- Elástico: rama descendente con p = k + (1-k)·Tb/T (ec. 3.1.3) ---
+      const tDesc = 3.0;
+      final pExp = site.k + (1 - site.k) * (site.tb / tDesc);
+      expect(
+        elasticAt(tDesc),
+        closeTo(site.c * math.pow(site.tb / tDesc, pExp), 0.002),
+      );
+      // En T=Tb el exponente es exactamente k -> ae(Tb)=c
+      expect(elasticAt(site.tb), closeTo(site.c, 0.001));
+
+      // --- Diseño en meseta (ec. 3.4.1 + 3.5.1): ---
+      // Q'(meseta) = 1 + (Q-1)/sqrt(k); R = k1*R0 + k2, k2=0 pues T>=Ta
+      const q = 2.0;
+      final qpMeseta = 1 + (q - 1) * math.sqrt(1 / site.k);
+      final adMesetaEsperada = site.c / (qpMeseta * factors.k1 * 1.75);
+      expect(designAt(site.tb), closeTo(adMesetaEsperada, 0.005));
+
+      // --- Rama ascendente T<Ta con k2>0: R(T) = k1*R0 + 0.5*(1-T/Ta) ---
+      // En T=0: Q'=1 (Q'-raíz con T/Ta=0), R = 1*1.75+0.5 = 2.25
+      expect(designAt(0.0), closeTo(site.a0 / 2.25, 0.005));
+
+      // Sin a_min: ad(T=0) < a0/2 ya que R(0)=2.25 > 2
+      expect(designAt(0.0), lessThan(site.a0 / 2.0));
+
+      // Sobrerresistencia reportada = k1*R0base (meseta)
+      expect(result.r0, closeTo(1.75, 1e-9));
+
+      // Irregular ×0.8 corrige Q' con piso 1: meseta Q'=max(1, 0.8·qp)
+      const factorsIrregular = SeismicFactors(
+        importanceGroup: ImportanceGroup.grupoB,
+        q: 2.0,
+        irregularity: IrregularityFactor.fuertementeIrregular,
+        k1: 1.0,
+        norm: NormVersion.ntc2017,
+      );
+      final resultIrregular = SeismicEngine.computeSpectrum(
+        site: site,
+        factors: factorsIrregular,
+      );
+      final qpCorregida = math.max(1.0, 0.8 * qpMeseta);
+      expect(
+        resultIrregular.designSpectrum[(site.tb / 0.02).round()].acceleration,
+        closeTo(site.c / (qpCorregida * 1.75), 0.005),
+      );
+    });
+
     test('Export Service generates valid SAP2000 and CSV strings', () {
       final site = SeismicEngine.calculateSiteParameters(19.432608, -99.133208);
       const factors = SeismicFactors();
@@ -127,14 +194,14 @@ void main() {
       const k = 0.56;
       const tb = 1.719;
       // En T = Tb, p debe ser exactamente k.
-      expect(SeismicEngine.pExponent2023(k, tb, tb), closeTo(k, 1e-12));
+      expect(SeismicEngine.pExponentNorm(k, tb, tb), closeTo(k, 1e-12));
       // Justo antes de Tb también es k (rama de meseta).
-      expect(SeismicEngine.pExponent2023(k, tb, tb - 0.01), k);
+      expect(SeismicEngine.pExponentNorm(k, tb, tb - 0.01), k);
       // Después de Tb, p decrece monótonamente desde 1 hacia k (si k<1).
-      double prev = SeismicEngine.pExponent2023(k, tb, tb + 0.01);
+      double prev = SeismicEngine.pExponentNorm(k, tb, tb + 0.01);
       expect(prev, lessThanOrEqualTo(1.0));
       for (double t = tb + 0.11; t <= 5.0; t += 0.1) {
-        final curr = SeismicEngine.pExponent2023(k, tb, t);
+        final curr = SeismicEngine.pExponentNorm(k, tb, t);
         expect(curr, lessThan(prev));
         expect(curr, greaterThanOrEqualTo(k));
         prev = curr;
@@ -148,11 +215,11 @@ void main() {
       const tb = 1.719;
       // En T=0: Q' = 1
       expect(
-        SeismicEngine.qPrime2023(q: q, k: k, ta_: ta, tb_: tb, t: 0.0),
+        SeismicEngine.qPrimeNorm(q: q, k: k, ta_: ta, tb_: tb, t: 0.0),
         1.0,
       );
       // En T = Ta: Q' = 1 + (Q−1)·√(1/k)
-      final qpTa = SeismicEngine.qPrime2023(
+      final qpTa = SeismicEngine.qPrimeNorm(
         q: q,
         k: k,
         ta_: ta,
@@ -161,7 +228,7 @@ void main() {
       );
       expect(qpTa, closeTo(1 + (q - 1) * math.sqrt(1 / k), 1e-9));
       // En meseta se mantiene constante
-      final qpMeseta = SeismicEngine.qPrime2023(
+      final qpMeseta = SeismicEngine.qPrimeNorm(
         q: q,
         k: k,
         ta_: ta,
@@ -171,7 +238,7 @@ void main() {
       expect(qpMeseta, closeTo(qpTa, 1e-9));
       // Q=1 => Q'=1 en todo T
       expect(
-        SeismicEngine.qPrime2023(q: 1.0, k: k, ta_: ta, tb_: tb, t: 3.0),
+        SeismicEngine.qPrimeNorm(q: 1.0, k: k, ta_: ta, tb_: tb, t: 3.0),
         1.0,
       );
     });
@@ -179,21 +246,21 @@ void main() {
     test('NTC 2023: R = k1·R0 + k2 con k2=0 para T ≥ Ta (ec. 3.3.1)', () {
       // Q >= 3 -> R0 = 2.0; si no 1.75
       expect(
-        SeismicEngine.rTotal2023(q: 4.0, k1: 1.25, ta_: 1.08, t: 1.08),
+        SeismicEngine.rTotalNorm(q: 4.0, k1: 1.25, ta_: 1.08, t: 1.08),
         closeTo(2.5, 1e-9),
       );
       expect(
-        SeismicEngine.rTotal2023(q: 2.0, k1: 1.0, ta_: 1.08, t: 1.08),
+        SeismicEngine.rTotalNorm(q: 2.0, k1: 1.0, ta_: 1.08, t: 1.08),
         closeTo(1.75, 1e-9),
       );
       // k2 > 0 solo para T < Ta: en T=0, k2=0.5
       expect(
-        SeismicEngine.rTotal2023(q: 2.0, k1: 1.0, ta_: 1.08, t: 0.0),
+        SeismicEngine.rTotalNorm(q: 2.0, k1: 1.0, ta_: 1.08, t: 0.0),
         closeTo(1.75 + 0.5, 1e-9),
       );
       // En T ≥ Ta, k2 = 0
       expect(
-        SeismicEngine.rTotal2023(q: 2.0, k1: 1.0, ta_: 1.08, t: 2.0),
+        SeismicEngine.rTotalNorm(q: 2.0, k1: 1.0, ta_: 1.08, t: 2.0),
         closeTo(1.75, 1e-9),
       );
     });
@@ -226,7 +293,7 @@ void main() {
       expect(elasticAt(site.tb), closeTo(c, 0.001));
       // Elástico descendente con p variable: ae(T>Tb) > c·(Tb/T)^k cuando k<1
       final tFar = 4.0;
-      final pFar = SeismicEngine.pExponent2023(site.k, site.tb, tFar);
+      final pFar = SeismicEngine.pExponentNorm(site.k, site.tb, tFar);
       expect(pFar, greaterThan(site.k)); // k=0.56 < 1 → p>k
       // Ocupación Inmediata fuerza Q=1 y R'=0.75R → diseño mayor que SV
       const factorsOI = SeismicFactors(

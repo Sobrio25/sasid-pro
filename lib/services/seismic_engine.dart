@@ -207,14 +207,6 @@ class SeismicEngine {
     );
   }
 
-  /// Factor de sobrerresistencia base (modo 2017/2023): función de Q y k1.
-  static double r0ForQ(double q, double k1) {
-    if (q >= 3.0) return 2.0 * k1;
-    if (q >= 2.0) return 1.75 * k1;
-    if (q >= 1.5) return 1.50 * k1;
-    return 1.00;
-  }
-
   /// Calcula el espectro completo (Elástico, Diseño, EPU y Comparativas).
   static SpectrumResult computeSpectrum({
     required SiteParameters site,
@@ -236,7 +228,7 @@ class SeismicEngine {
 
   /// Exponente variable de la rama descendente (ecuación 3.1.2b):
   /// p = k + (1 − k)·(Tb/T). En T = Tb devuelve exactamente k.
-  static double pExponent2023(double k, double tb, double t) {
+  static double pExponentNorm(double k, double tb, double t) {
     if (t <= tb || t <= 0) return k;
     return k + (1 - k) * (tb / t);
   }
@@ -245,7 +237,7 @@ class SeismicEngine {
   /// T ≤ Ta:   Q' = 1 + (Q−1)·√((T/Ta)/k)
   /// Ta<T≤Tb:  Q' = 1 + (Q−1)·√(1/k)
   /// T > Tb:   Q' = 1 + (Q−1)·√(p/k)
-  static double qPrime2023({
+  static double qPrimeNorm({
     required double q,
     required double k,
     required double ta_,
@@ -259,7 +251,7 @@ class SeismicEngine {
     }
     double p = 1.0;
     if (t > tb_) {
-      p = pExponent2023(k, tb_, t);
+      p = pExponentNorm(k, tb_, t);
     }
     final ratio = t <= tb_ ? 1.0 / k : p / k;
     return 1.0 + (q - 1.0) * math.sqrt(ratio);
@@ -268,7 +260,7 @@ class SeismicEngine {
   /// Sobrerresistencia total R(T) = k1·R0 + k2 (ecuación 3.3.1a),
   /// con k2 = 0.5·[1 − T/Ta] > 0 (ecuación 3.3.1b).
   /// R0 = 2.0 para Q ≥ 3; 1.75 en otro caso.
-  static double rTotal2023({
+  static double rTotalNorm({
     required double q,
     required double k1,
     required double ta_,
@@ -311,27 +303,27 @@ class SeismicEngine {
       } else if (t <= site.tb) {
         ae = site.c;
       } else {
-        final p = pExponent2023(site.k, site.tb, t);
+        final p = pExponentNorm(site.k, site.tb, t);
         ae = site.c * math.pow(site.tb / t, p);
       }
       elastic.add(SpectrumPoint(period: t, acceleration: ae));
 
       // Reducción: ad = I · ae / (Q' · R') — sin factor α en 2023.
-      final qp = qPrime2023(
+      final qp = qPrimeNorm(
         q: qNorm,
         k: site.k,
         ta_: site.ta,
         tb_: site.tb,
         t: t,
       );
-      final rTotal = rTotal2023(q: qNorm, k1: factors.k1, ta_: site.ta, t: t);
+      final rTotal = rTotalNorm(q: qNorm, k1: factors.k1, ta_: site.ta, t: t);
       final rPrime = rTotal * factors.performanceLevel.rFactor;
 
       double ad = (iFactor * ae) / (qp * rPrime);
       final double aMin =
           (site.a0 * iFactor) /
           (2.0 *
-              rTotal2023(q: qNorm, k1: factors.k1, ta_: site.ta, t: site.ta));
+              rTotalNorm(q: qNorm, k1: factors.k1, ta_: site.ta, t: site.ta));
       if (ad < aMin) ad = aMin;
 
       if (ad > aMaxDesign) aMaxDesign = ad;
@@ -420,16 +412,33 @@ class SeismicEngine {
   }
 
   // ------------------------------------------------------------------
-  // MODO 2017/2023 (tablas por zona + Q'/R'/α)
+  // MODO 2017 (NTC-Sismo 2017, numerales 3.1.2/3.1.3, 3.4.1, 3.5.1/3.5.2
+  // y sección 5.5 para corrección por irregularidad)
   // ------------------------------------------------------------------
+
+  /// Corrección de Q' por irregularidad (sección 5.5 NTC-2017):
+  /// Q' se multiplica por 0.8 (irregular) o 0.7 (muy irregular),
+  /// sin que Q' resulte menor que 1.
+  static double qPrimeWithIrregularity({
+    required double qPrime,
+    required double irregularityFactor,
+  }) {
+    final corrected = qPrime * irregularityFactor;
+    return corrected < 1.0 ? 1.0 : corrected;
+  }
+
+  /// Sobrerresistencia base R0 según ecuación 3.5.1:
+  /// 2.0 para mampostería y sistemas con Q ≥ 3; 1.75 en otro caso.
+  static double r0Base2017(double q) => q >= 3.0 ? 2.0 : 1.75;
+
   static SpectrumResult _computeSpectrum2017({
     required SiteParameters site,
     required SeismicFactors factors,
   }) {
-    final r0 = r0ForQ(factors.q, factors.k1);
     final iFactor = factors.importanceGroup.factor;
     final alpha = factors.irregularity.factor;
     final qFactor = factors.q;
+    final r0base = r0Base2017(qFactor);
 
     const double maxT = 5.0;
     const double dt = 0.02;
@@ -443,30 +452,34 @@ class SeismicEngine {
     for (int step = 0; step <= steps; step++) {
       final t = double.parse((step * dt).toStringAsFixed(3));
 
+      // Espectro elástico (ec. 3.1.2) con exponente variable p (ec. 3.1.3).
       double ae;
       if (t < site.ta) {
         ae = site.a0 + (site.c - site.a0) * (t / site.ta);
       } else if (t <= site.tb) {
         ae = site.c;
       } else {
-        ae = site.c * math.pow(site.tb / t, site.k);
+        final p = pExponentNorm(site.k, site.tb, t);
+        ae = site.c * math.pow(site.tb / t, p);
       }
       elastic.add(SpectrumPoint(period: t, acceleration: ae));
 
-      double qPrime;
-      double rPrime;
-      if (t < site.ta) {
-        qPrime = 1.0 + (qFactor - 1.0) * (t / site.ta);
-        rPrime = 1.0 + (r0 - 1.0) * (t / site.ta);
-      } else {
-        qPrime = qFactor;
-        rPrime = r0;
-      }
+      // Reducción: ad = I · ae / (Q'_eff · R), con Q'_eff corregido por
+      // irregularidad (sección 5.5) y R = k1·R0 + k2 (ecuación 3.5.1).
+      double qPrime = qPrimeNorm(
+        q: qFactor,
+        k: site.k,
+        ta_: site.ta,
+        tb_: site.tb,
+        t: t,
+      );
+      qPrime = qPrimeWithIrregularity(
+        qPrime: qPrime,
+        irregularityFactor: alpha,
+      );
+      final rTotal = rTotalNorm(q: qFactor, k1: factors.k1, ta_: site.ta, t: t);
 
-      double ad = (iFactor * ae) / (qPrime * rPrime * alpha);
-      final double aMin = (site.a0 * iFactor) / (2.0 * r0 * alpha);
-      if (ad < aMin) ad = aMin;
-
+      final double ad = (iFactor * ae) / (qPrime * rTotal);
       if (ad > aMaxDesign) aMaxDesign = ad;
       design.add(SpectrumPoint(period: t, acceleration: ad));
 
@@ -500,7 +513,7 @@ class SeismicEngine {
     return SpectrumResult(
       site: site,
       factors: factors,
-      r0: double.parse(r0.toStringAsFixed(3)),
+      r0: double.parse((factors.k1 * r0base).toStringAsFixed(3)),
       aMaxDesign: double.parse(aMaxDesign.toStringAsFixed(4)),
       elasticSpectrum: elastic,
       designSpectrum: design,
@@ -516,7 +529,6 @@ class SeismicEngine {
     SeismicFactors factors,
     double targetQ,
   ) {
-    final r0 = r0ForQ(targetQ, factors.k1);
     final iFactor = factors.importanceGroup.factor;
     final alpha = factors.irregularity.factor;
     final List<SpectrumPoint> points = [];
@@ -533,18 +545,24 @@ class SeismicEngine {
       } else if (t <= site.tb) {
         ae = site.c;
       } else {
-        ae = site.c * math.pow(site.tb / t, site.k);
+        final p = pExponentNorm(site.k, site.tb, t);
+        ae = site.c * math.pow(site.tb / t, p);
       }
 
-      double qPrime = t < site.ta
-          ? 1.0 + (targetQ - 1.0) * (t / site.ta)
-          : targetQ;
-      double rPrime = t < site.ta ? 1.0 + (r0 - 1.0) * (t / site.ta) : r0;
+      double qPrime = qPrimeNorm(
+        q: targetQ,
+        k: site.k,
+        ta_: site.ta,
+        tb_: site.tb,
+        t: t,
+      );
+      qPrime = qPrimeWithIrregularity(
+        qPrime: qPrime,
+        irregularityFactor: alpha,
+      );
+      final rTotal = rTotalNorm(q: targetQ, k1: factors.k1, ta_: site.ta, t: t);
 
-      double ad = (iFactor * ae) / (qPrime * rPrime * alpha);
-      final double aMin = (site.a0 * iFactor) / (2.0 * r0 * alpha);
-      if (ad < aMin) ad = aMin;
-
+      final double ad = (iFactor * ae) / (qPrime * rTotal);
       points.add(SpectrumPoint(period: t, acceleration: ad));
     }
     return points;
