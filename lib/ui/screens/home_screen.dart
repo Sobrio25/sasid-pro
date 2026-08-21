@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _result = SeismicEngine.computeSpectrum(
-      site: SeismicEngine.calculateSiteParameters(
+      site: SeismicEngine.calculateSiteParametersSync(
         _currentLat,
         _currentLon,
         epoch: _factors.epoch,
@@ -53,7 +53,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _currentLat,
       _currentLon,
       epoch: _factors.epoch,
-      norm: _factors.norm,
     );
     if (!mounted) return;
     setState(() {

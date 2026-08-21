@@ -70,141 +70,80 @@ class SeismicEngine {
   }
 
   /// Cálculo con mallas reales: Ts desde ES_DF{época}.grd (DSAA ASCII).
+  ///
+  /// Las tres normas (2016/2017/2023) derivan los parámetros del sitio de la
+  /// misma malla SASID continua: el numeral 3.1.2 —idéntico en 2017 y 2023—
+  /// establece que a0, c, k, Ta, Tb y Ts "se tomarán del SASID". Las normas
+  /// solo difieren en las fórmulas de reducción, no en los parámetros.
   static Future<SiteParameters> calculateSiteParametersWithGrid(
     double lat,
     double lon, {
     Epoch epoch = Epoch.y2010,
-    NormVersion norm = NormVersion.ntc2016,
   }) async {
     final tsGrid = await GrdService.interpolateTs(lat, lon, epoch.assetPath);
-    if (norm == NormVersion.ntc2016 || norm == NormVersion.ntc2023) {
-      // Ambas normas usan parámetros continuos provistos por SASID
-      // interpolados de la malla ES_DF{época} (numeral 3.1.2 NTC-2023).
-      final ts = tsGrid ?? _fallbackTs(lat, lon);
-      final p = params2016ForTs(ts, epoch: epoch);
-      return SiteParameters(
-        latitude: lat,
-        longitude: lon,
-        ts: p.ts,
-        a0: p.a0,
-        c: p.c,
-        ta: p.ta,
-        tb: p.tb,
-        k: p.k,
-        zone: p.zone,
-        epoch: epoch,
-        activeMallaHex: epoch.hexCode,
-      );
-    }
-    final base = calculateSiteParameters(lat, lon, epoch: epoch);
-    return base;
+    final ts = tsGrid ?? _fallbackTs(lat, lon);
+    final p = params2016ForTs(ts, epoch: epoch);
+    return SiteParameters(
+      latitude: lat,
+      longitude: lon,
+      ts: p.ts,
+      a0: p.a0,
+      c: p.c,
+      ta: p.ta,
+      tb: p.tb,
+      k: p.k,
+      zone: p.zone,
+      epoch: epoch,
+      activeMallaHex: epoch.hexCode,
+    );
   }
 
-  /// Fallback sin grid: aproximación este-oeste (offline).
+  /// Cálculo síncrono sin grid (fallbackTs + modelo continuo). Se usa para la
+  /// primera pintura de la UI antes de que el cálculo async con grid llegue;
+  /// produce parámetros consistentes entre normas.
+  static SiteParameters calculateSiteParametersSync(
+    double lat,
+    double lon, {
+    Epoch epoch = Epoch.y2010,
+  }) {
+    final ts = _fallbackTs(lat, lon);
+    final p = params2016ForTs(ts, epoch: epoch);
+    return SiteParameters(
+      latitude: lat,
+      longitude: lon,
+      ts: p.ts,
+      a0: p.a0,
+      c: p.c,
+      ta: p.ta,
+      tb: p.tb,
+      k: p.k,
+      zone: p.zone,
+      epoch: epoch,
+      activeMallaHex: epoch.hexCode,
+    );
+  }
+
+  /// Fallback sin grid: aproximación este-oeste (offline) con ajustes por
+  /// Pedregal/CU (sur volcánico) y Sierra de Guadalupe (norte volcánico).
   static double _fallbackTs(double lat, double lon) {
-    double lakeIndex = ((lon + 99.205) / 0.11).clamp(0.0, 1.0);
+    final clampedLat = lat.clamp(19.05, 19.65);
+    final clampedLon = lon.clamp(-99.40, -98.85);
+    double lakeIndex = ((clampedLon - (-99.205)) / 0.11).clamp(0.0, 1.0);
+
+    // Ajuste zona sur (Pedregal de San Ángel, CU, Tlalpan: lomas volcánicas)
+    if (clampedLat < 19.34 && clampedLon < -99.14) {
+      lakeIndex = math.max(0.0, lakeIndex - 0.45);
+    }
+    // Ajuste Sierra de Guadalupe (norte de GAM: roca volcánica)
+    if (clampedLat > 19.52 && clampedLon < -99.10) {
+      lakeIndex = math.max(0.0, lakeIndex - 0.50);
+    }
+
     if (lakeIndex <= 0.12) return 0.20 + (lakeIndex / 0.12) * 0.30;
     if (lakeIndex <= 0.28) return 0.50 + ((lakeIndex - 0.12) / 0.16) * 0.50;
     if (lakeIndex <= 0.55) return 1.00 + ((lakeIndex - 0.28) / 0.27) * 1.00;
     if (lakeIndex <= 0.80) return 2.00 + ((lakeIndex - 0.55) / 0.25) * 1.00;
     return 3.00 + ((lakeIndex - 0.80) / 0.20).clamp(0.0, 1.0);
-  }
-
-  /// Cálculo sincrónico legacy (tablas 2017/2023 por zona).
-  static SiteParameters calculateSiteParameters(
-    double lat,
-    double lon, {
-    Epoch epoch = Epoch.y2010,
-  }) {
-    final clampedLat = lat.clamp(19.05, 19.65);
-    final clampedLon = lon.clamp(-99.40, -98.85);
-
-    double lakeIndex = ((clampedLon - (-99.205)) / 0.11).clamp(0.0, 1.0);
-
-    if (clampedLat < 19.34 && clampedLon < -99.14) {
-      lakeIndex = math.max(0.0, lakeIndex - 0.45);
-    }
-    if (clampedLat > 19.52 && clampedLon < -99.10) {
-      lakeIndex = math.max(0.0, lakeIndex - 0.50);
-    }
-
-    double ts;
-    if (lakeIndex <= 0.12) {
-      ts = 0.20 + (lakeIndex / 0.12) * 0.30;
-    } else if (lakeIndex <= 0.28) {
-      final t = (lakeIndex - 0.12) / 0.16;
-      ts = 0.50 + t * 0.50;
-    } else if (lakeIndex <= 0.55) {
-      final t = (lakeIndex - 0.28) / 0.27;
-      ts = 1.00 + t * 1.00;
-    } else if (lakeIndex <= 0.80) {
-      final t = (lakeIndex - 0.55) / 0.25;
-      ts = 2.00 + t * 1.00;
-    } else {
-      final t = (lakeIndex - 0.80) / 0.20;
-      ts = 3.00 + t * 1.00;
-    }
-    ts = ts.clamp(0.2, 4.0);
-
-    final zone = _zoneForTs(ts);
-
-    double a0, c, ta, tb, k;
-    if (ts <= 0.5) {
-      a0 = 0.06;
-      c = 0.18 + (ts / 0.5) * 0.04;
-      ta = 0.20;
-      tb = 0.60;
-      k = 1.00;
-    } else if (ts <= 1.0) {
-      final factor = (ts - 0.5) / 0.5;
-      a0 = 0.08 + factor * 0.04;
-      c = 0.22 + factor * 0.23;
-      ta = 0.20 + factor * 0.40;
-      tb = 0.60 + factor * 0.90;
-      k = 1.00 - factor * 0.20;
-    } else if (ts <= 1.5) {
-      final factor = (ts - 1.0) / 0.5;
-      a0 = 0.12 + factor * 0.06;
-      c = 0.45 + factor * 0.18;
-      ta = 0.60 + factor * 0.35;
-      tb = 1.50 + factor * 0.30;
-      k = 0.80 - factor * 0.15;
-    } else if (ts <= 2.0) {
-      final factor = (ts - 1.5) / 0.5;
-      a0 = 0.18 + factor * 0.08;
-      c = 0.63 + factor * 0.17;
-      ta = 0.95 + factor * 0.35;
-      tb = 1.80 + factor * 0.40;
-      k = 0.65 - factor * 0.05;
-    } else if (ts <= 3.0) {
-      final factor = (ts - 2.0) / 1.0;
-      a0 = 0.26 + factor * 0.08;
-      c = 0.80 + factor * 0.20;
-      ta = 1.30 + factor * 0.80;
-      tb = 2.20 + factor * 0.70;
-      k = 0.60 - factor * 0.05;
-    } else {
-      final factor = ((ts - 3.0) / 1.0).clamp(0.0, 1.0);
-      a0 = 0.34 + factor * 0.04;
-      c = 1.00 + factor * 0.12;
-      ta = 2.10 + factor * 0.50;
-      tb = 2.90 + factor * 0.60;
-      k = 0.55 + factor * 0.10;
-    }
-
-    return SiteParameters(
-      latitude: lat,
-      longitude: lon,
-      ts: double.parse(ts.toStringAsFixed(3)),
-      a0: double.parse(a0.toStringAsFixed(3)),
-      c: double.parse(c.toStringAsFixed(3)),
-      ta: double.parse(ta.toStringAsFixed(3)),
-      tb: double.parse(tb.toStringAsFixed(3)),
-      k: double.parse(k.toStringAsFixed(3)),
-      zone: zone,
-      epoch: epoch,
-      activeMallaHex: epoch.hexCode,
-    );
   }
 
   /// Calcula el espectro completo (Elástico, Diseño, EPU y Comparativas).

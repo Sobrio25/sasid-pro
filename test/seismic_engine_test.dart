@@ -9,7 +9,10 @@ import 'package:sasid_app/services/export_service.dart';
 void main() {
   group('SeismicEngine Unit Tests', () {
     test('Calculate Lomas Zone (Santa Fe / CU)', () {
-      final site = SeismicEngine.calculateSiteParameters(19.332822, -99.186638);
+      final site = SeismicEngine.calculateSiteParametersSync(
+        19.332822,
+        -99.186638,
+      );
       expect(site.zone, equals(GeotechnicalZone.zonaI));
       expect(site.ts, lessThanOrEqualTo(0.5));
       expect(site.a0, greaterThan(0.0));
@@ -18,13 +21,50 @@ void main() {
     });
 
     test('Calculate Lake Zone (Zócalo)', () {
-      final site = SeismicEngine.calculateSiteParameters(19.432608, -99.133208);
+      final site = SeismicEngine.calculateSiteParametersSync(
+        19.432608,
+        -99.133208,
+      );
       expect(site.ts, greaterThan(1.0));
       expect(site.c, greaterThan(0.40));
     });
 
+    test('Parámetros de sitio idénticos entre las 3 normas (mismo SASID)', () {
+      // El numeral 3.1.2 (2017 y 2023) y el programa SASID A toman los
+      // parámetros del mismo modelo continuo; solo cambia la reducción.
+      final s16 = SeismicEngine.params2016ForTs(1.335);
+      final s17 = SeismicEngine.params2016ForTs(1.335);
+      final s23 = SeismicEngine.params2016ForTs(1.335);
+      expect(s17.ts, s16.ts);
+      expect(s23.ts, s16.ts);
+      expect(s23.c, s16.c);
+    });
+
+    test('NTC 2017 y NTC 2023 producen diseño idéntico con Q=1', () {
+      // Con Q=1: Q'=1 en ambas; R idéntico; SV no altera nada -> espectros
+      // de diseño iguales (2023 solo difiere por niveles de desempeño).
+      final site = SeismicEngine.params2016ForTs(2.288);
+      const f17 = SeismicFactors(q: 1.0, norm: NormVersion.ntc2017);
+      const f23 = SeismicFactors(
+        q: 1.0,
+        norm: NormVersion.ntc2023,
+        performanceLevel: PerformanceLevel.seguridadVida,
+      );
+      final r17 = SeismicEngine.computeSpectrum(site: site, factors: f17);
+      final r23 = SeismicEngine.computeSpectrum(site: site, factors: f23);
+      for (int i = 0; i < r17.designSpectrum.length; i += 25) {
+        expect(
+          r23.designSpectrum[i].acceleration,
+          closeTo(r17.designSpectrum[i].acceleration, 1e-9),
+        );
+      }
+    });
+
     test('Compute Spectrum curves and inelastic reduction', () {
-      final site = SeismicEngine.calculateSiteParameters(19.432608, -99.133208);
+      final site = SeismicEngine.calculateSiteParametersSync(
+        19.432608,
+        -99.133208,
+      );
       const factors = SeismicFactors(
         importanceGroup: ImportanceGroup.grupoB,
         q: 2.0,
@@ -126,7 +166,10 @@ void main() {
     });
 
     test('Export Service generates valid SAP2000 and CSV strings', () {
-      final site = SeismicEngine.calculateSiteParameters(19.432608, -99.133208);
+      final site = SeismicEngine.calculateSiteParametersSync(
+        19.432608,
+        -99.133208,
+      );
       const factors = SeismicFactors();
       final result = SeismicEngine.computeSpectrum(
         site: site,
